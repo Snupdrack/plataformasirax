@@ -1,0 +1,114 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+:root {
+  --background: 0 0% 100%;
+  --foreground: 222 47% 4%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 4%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 4%;
+  --primary: 222 47% 4%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 210 40% 96%;
+  --secondary-foreground: 222 47% 11%;
+  --muted: 210 40% 96%;
+  --muted-foreground: 215 16% 47%;
+  --accent: 210 40% 96%;
+  --accent-foreground: 222 47% 11%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 214 32% 91%;
+  --input: 214 32% 91%;
+  --ring: 222 47% 4%;
+  --radius: 0.5rem;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "cv11", "ss01";
+}
+
+h1, h2, h3, h4, h5, h6, .font-display {
+  font-family: 'Manrope', sans-serif;
+  letter-spacing: -0.025em;
+}
+
+.font-mono, code, pre {
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+/* Custom marketing grid (subtle dotted background) */
+.grid-pattern {
+  background-image:
+    linear-gradient(to right, rgba(255,255,255,0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,0.04) 1px, transparent 1px);
+  background-size: 56px 56px;
+}
+
+.grid-pattern-light {
+  background-image:
+    linear-gradient(to right, rgba(15,23,42,0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(15,23,42,0.04) 1px, transparent 1px);
+  background-size: 56px 56px;
+}
+
+/* Scrollbar polish */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: hsl(214 32% 85%); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: hsl(215 25% 65%); }
+
+/* Cytoscape container hard background */
+.cy-container { background: hsl(210 40% 98%); }
+
+/* Selection color */
+::selection { background: hsl(222 47% 4%); color: white; }
+
+/* Marquee / shimmer for skeleton */
+@keyframes shimmer {
+  0% { background-position: -1000px 0; }
+  100% { background-position: 1000px 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, hsl(214 32% 95%) 0%, hsl(214 32% 90%) 50%, hsl(214 32% 95%) 100%);
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite linear;
+}
+
+/* Marketing hero noise overlay */
+.noise-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/%3E%3C/svg%3E");
+  opacity: 0.05;
+}
+
+/* Risk badges */
+.risk-CRITICO { @apply bg-rose-600 text-white; }
+.risk-ALTO    { @apply bg-rose-500 text-white; }
+.risk-MEDIO   { @apply bg-amber-500 text-white; }
+.risk-BAJO    { @apply bg-emerald-600 text-white; }
+
+.risk-subtle-CRITICO { @apply bg-rose-50 text-rose-700 border-rose-200; }
+.risk-subtle-ALTO    { @apply bg-rose-50 text-rose-700 border-rose-200; }
+.risk-subtle-MEDIO   { @apply bg-amber-50 text-amber-700 border-amber-200; }
+.risk-subtle-BAJO    { @apply bg-emerald-50 text-emerald-700 border-emerald-200; }

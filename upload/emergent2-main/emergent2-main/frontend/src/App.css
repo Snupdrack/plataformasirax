@@ -1,0 +1,2 @@
+/* App.css — minimal overrides; design lives in index.css and Tailwind classes. */
+.App { min-height: 100vh; }
