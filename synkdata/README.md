@@ -128,6 +128,10 @@ alembic upgrade head
 # Inicializar extensiones PostgreSQL
 psql -h localhost -U synkdata -d synkdata -f scripts/init-db.sql
 
+# Crear el usuario administrador inicial
+python scripts/create_admin.py --interactive
+# (o con variables de entorno: python scripts/create_admin.py)
+
 # (Opcional) Cargar datos de prueba
 python scripts/seed_data.py
 
@@ -164,8 +168,30 @@ synkdata/
 │   ├── database.py                # Conexiones PostgreSQL, Redis, Neo4j
 │   ├── dependencies.py            # Dependencias FastAPI (DB, auth, pagination)
 │   │
+│   ├── templates/                 # Plantillas Jinja2 (UI)
+│   │   ├── base.html              # Layout base (Tailwind + Alpine.js)
+│   │   ├── landing.html           # Landing page pública
+│   │   ├── success.html           # Página de éxito tras solicitar acceso
+│   │   ├── auth/
+│   │   │   └── login.html         # Login clientes + admin
+│   │   ├── admin/
+│   │   │   └── panel.html         # Panel admin (solicitudes, usuarios, actividad)
+│   │   ├── dashboard/
+│   │   │   ├── index.html         # Dashboard cliente (verificaciones, scoring)
+│   │   │   └── verification_detail.html
+│   │   └── partials/
+│   │       ├── navbar.html
+│   │       └── footer.html
+│   │
+│   ├── static/                    # Assets estáticos (CSS, JS, imágenes)
+│   │   ├── css/custom.css
+│   │   ├── js/app.js              # Cliente API, toasts, Alpine components
+│   │   ├── js/charts.js           # Chart.js helpers (gauges, donut, trends)
+│   │   └── img/logo.svg
+│   │
 │   ├── models/                    # SQLAlchemy ORM models
 │   │   ├── base.py                # Base model + TimestampMixin + SoftDeleteMixin
+│   │   ├── user.py                # User (ADMIN/CLIENT), AccessRequest
 │   │   ├── verification.py        # VerificationRequest, CurpValidation, RfcValidation
 │   │   ├── screening.py           # ScreeningRequest, ScreeningMatch, WatchlistEntry
 │   │   ├── digital_intelligence.py # EmailAnalysis, PhoneAnalysis, UsernameAnalysis
@@ -173,6 +199,7 @@ synkdata/
 │   │   └── analytics.py           # VerificationEvent, Alert
 │   │
 │   ├── schemas/                   # Pydantic request/response schemas
+│   │   ├── user.py                # Login, AccessRequest, AdminCreateUser, etc.
 │   │   ├── verification.py
 │   │   ├── screening.py
 │   │   ├── digital_intelligence.py
@@ -180,43 +207,49 @@ synkdata/
 │   │   └── analytics.py
 │   │
 │   ├── routers/                   # FastAPI route handlers
+│   │   ├── access.py              # Landing page + POST /access/request
+│   │   ├── auth.py                # Login, me, refresh, change-password
+│   │   ├── admin.py               # Panel admin (solo rol ADMIN)
+│   │   ├── dashboard.py           # Dashboard cliente (autenticado)
 │   │   ├── verify.py              # POST /verify
-│   │   ├── curp.py                # POST /curp/validate, /curp/search, GET /curp/{curp}
-│   │   ├── rfc.py                 # POST /rfc/validate, /rfc/verify-sat, GET /rfc/{rfc}
-│   │   ├── screening.py           # POST /screening/person, /screening/entity, etc.
-│   │   ├── identity.py            # POST /identity/correlate, /identity/assess
-│   │   ├── risk.py                # POST /risk/assess, /risk/quick
-│   │   └── analytics.py           # GET /analytics/dashboard, /analytics/alerts, etc.
+│   │   ├── curp.py                # CURP endpoints
+│   │   ├── rfc.py                 # RFC endpoints
+│   │   ├── screening.py           # Screening endpoints
+│   │   ├── identity.py            # Identity endpoints
+│   │   ├── risk.py                # Risk endpoints
+│   │   └── analytics.py           # Analytics endpoints
 │   │
 │   ├── services/                  # Lógica de negocio
-│   │   ├── curp_validator.py      # Validación CURP con RENAPO
-│   │   ├── rfc_validator.py       # Validación RFC con SAT
-│   │   ├── compliance_screening.py # Orquestador de screening multi-fuente
-│   │   ├── fuzzy_matcher.py       # Matching fuzzy + fonético español
-│   │   ├── email_intelligence.py  # HIBP, Hunter.io, MX, disposable
-│   │   ├── phone_intelligence.py  # Carrier, línea, spam
-│   │   ├── username_intelligence.py # 59+ plataformas
-│   │   ├── social_discovery.py    # LinkedIn, GitHub, scoring profesional
-│   │   ├── identity_correlation.py # Motor de correlación de identidad
-│   │   ├── trust_score.py         # Trust Score (señales positivas)
-│   │   ├── risk_engine.py         # Risk Score (señales negativas)
-│   │   ├── knowledge_graph.py     # Neo4j graph, detección de redes
-│   │   ├── ocr_service.py         # OCR INE, Pasaporte, Comprobante
-│   │   ├── ai_investigation.py    # Generación de reportes de investigación
-│   │   └── analytics_service.py   # Dashboard, métricas, alertas
+│   │   ├── auth_service.py        # Registro, login, JWT, hashing bcrypt
+│   │   ├── admin_service.py       # Stats admin, actividad, export
+│   │   ├── curp_validator.py
+│   │   ├── rfc_validator.py
+│   │   ├── compliance_screening.py
+│   │   ├── fuzzy_matcher.py
+│   │   ├── email_intelligence.py
+│   │   ├── phone_intelligence.py
+│   │   ├── username_intelligence.py
+│   │   ├── social_discovery.py
+│   │   ├── identity_correlation.py
+│   │   ├── trust_score.py
+│   │   ├── risk_engine.py
+│   │   ├── knowledge_graph.py
+│   │   ├── ocr_service.py
+│   │   ├── ai_investigation.py
+│   │   └── analytics_service.py
 │   │
 │   ├── integrations/              # Clientes de APIs externas
-│   │   ├── ofac.py                # OFAC SDN list
-│   │   ├── open_sanctions.py      # OpenSanctions API
-│   │   ├── interpol.py            # Interpol Red Notices
-│   │   ├── un_sanctions.py        # UN Security Council
-│   │   └── sat_client.py          # SAT (LFTP, 69-B, CFDI)
+│   │   ├── ofac.py
+│   │   ├── open_sanctions.py
+│   │   ├── interpol.py
+│   │   ├── un_sanctions.py
+│   │   └── sat_client.py
 │   │
 │   ├── utils/                     # Utilidades y algoritmos
-│   │   ├── curp_algorithm.py      # Algoritmo CURP (generación, validación, dígito verificador)
-│   │   ├── rfc_algorithm.py       # Algoritmo RFC (generación, validación, homoclave)
-│   │   ├── phonetic.py            # Codificación fonética española
-│   │   └── text_normalizer.py     # Normalización de texto y nombres
+│   │   ├── curp_algorithm.py
+│   │   ├── rfc_algorithm.py
+│   │   ├── phonetic.py
+│   │   └── text_normalizer.py
 │   │
 │   └── middleware/                 # Middleware personalizado
 │       ├── auth.py                # JWT authentication
@@ -224,35 +257,88 @@ synkdata/
 │       └── logging.py             # Request/response logging
 │
 ├── tests/                         # Test suite
-│   ├── conftest.py                # Fixtures compartidos
-│   ├── test_curp.py               # Tests de validación CURP
-│   ├── test_rfc.py                # Tests de validación RFC
-│   ├── test_screening.py          # Tests de screening
-│   ├── test_risk_engine.py        # Tests del motor de riesgo
-│   └── test_identity_correlation.py # Tests de correlación
+│   ├── conftest.py
+│   ├── test_curp.py
+│   ├── test_rfc.py
+│   ├── test_screening.py
+│   ├── test_risk_engine.py
+│   └── test_identity_correlation.py
 │
 ├── scripts/                       # Scripts de utilidad
 │   ├── init-db.sql                # Extensiones PostgreSQL
 │   ├── seed_data.py               # Datos de prueba
-│   └── setup_neo4j.py             # Configuración Neo4j
-│
-├── docs/
-│   └── api.yaml                   # OpenAPI 3.0 specification
+│   ├── setup_neo4j.py             # Configuración Neo4j
+│   └── create_admin.py            # Crear admin inicial
 │
 ├── alembic/                       # Migraciones de base de datos
 │   ├── env.py
 │   ├── script.py.mako
 │   └── versions/
+│       ├── 0001_users_access.py   # Tablas users + access_requests
+│       └── 0002_core_tables.py    # Resto de tablas
+│
+├── docs/
+│   └── api.yaml                   # OpenAPI 3.0 specification
 │
 ├── docker-compose.yml             # Docker Compose (Postgres, Redis, Neo4j, API)
 ├── Dockerfile                     # Container de la API
+├── railway.json                   # Railway deployment config
+├── railway.toml                   # Railway deployment alt config
+├── nixpacks.toml                  # Nixpacks build config (Railway)
+├── Procfile                       # Procfile (Railway/Heroku)
 ├── requirements.txt               # Dependencias Python
 ├── pyproject.toml                 # Metadata del proyecto
 ├── .env.example                   # Variables de entorno ejemplo
-├── .gitignore                     # Git ignore
-├── alembic.ini                    # Configuración Alembic
-└── README.md                      # Este archivo
+├── .gitignore
+├── alembic.ini
+└── README.md
 ```
+
+---
+
+## Flujo de Usuarios
+
+### Landing Page → Solicitud de Acceso → Aprobación Admin → Dashboard
+
+```
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│  Landing Page   │     │  Solicitud de    │     │  Panel Admin    │
+│  (Pública)      │────▶│  Acceso (FORM)   │────▶│  Revisa y       │
+│  /              │     │  /access/request │     │  Aprueba/Rechaza│
+└─────────────────┘     └──────────────────┘     └────────┬────────┘
+                                                          │
+                                                          ▼
+                                                ┌──────────────────┐
+                                                │  Admin crea      │
+                                                │  cuenta cliente  │
+                                                │  (POST /admin/   │
+                                                │   users)         │
+                                                └────────┬─────────┘
+                                                          │
+                                                          ▼
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│  Dashboard      │◀────│  Login (JWT)     │◀────│  Cliente recibe │
+│  Cliente        │     │  /login          │     │  credenciales   │
+│  /dashboard     │     │                  │     │  por email      │
+└─────────────────┘     └──────────────────┘     └─────────────────┘
+```
+
+### Roles
+
+| Rol | Acceso | Funciones |
+|-----|--------|-----------|
+| **ADMIN** | `/admin`, `/login` | Revisar solicitudes, crear usuarios, ver stats, actividad, exportar |
+| **CLIENT** | `/dashboard`, `/login` | Verificar identidad, ver historial, analítica personal |
+
+### Endpoints de UI
+
+| Ruta | Descripción |
+|------|-------------|
+| `GET /` | Landing page pública |
+| `GET /login` | Login (clientes y admin) |
+| `GET /dashboard` | Dashboard cliente (requiere JWT CLIENT) |
+| `GET /admin` | Panel admin (requiere JWT ADMIN) |
+| `GET /dashboard/verification/{id}` | Detalle de verificación |
 
 ---
 
@@ -455,6 +541,139 @@ alembic upgrade head
 - **Cache**: Redis para resultados costosos con TTL apropiado
 - **Errores**: Degradación elegante — los fallos de APIs externas no deben crashear el sistema
 - **Validación**: Pydantic schemas para todos los inputs/outputs
+
+---
+
+## Despliegue en Railway
+
+Railway es la forma más rápida de desplegar SynkData en producción. El proyecto incluye los archivos `railway.json`, `railway.toml`, `nixpacks.toml` y `Procfile` preconfigurados.
+
+### Paso a Paso
+
+#### 1. Crear cuenta y proyecto en Railway
+
+1. Ve a https://railway.app y crea una cuenta (o inicia sesión con GitHub).
+2. Crea un **New Project** → **Deploy from GitHub repo** (sube el proyecto a un repo público o privado).
+
+#### 2. Añadir servicios de base de datos
+
+En el proyecto Railway, click **+ New** y añade:
+
+1. **PostgreSQL** — Railway creará una instancia gestionada.
+2. **Redis** — necesaria para caché y rate limiting.
+
+> **Neo4j**: Railway no ofrece Neo4j como servicio gestionado. Puedes usar **Neo4j Aura Free** (https://neo4j.com/cloud/aura-free/) y conectar vía `bolt+s://` URL.
+
+#### 3. Configurar variables de entorno
+
+En el servicio web (la API), ve a **Variables** y añade:
+
+```env
+# App
+SYNKDATA_ENV=production
+SYNKDATA_API_PREFIX=/api/v1
+
+# Seguridad — genera con: openssl rand -hex 32
+SYNKDATA_SECRET_KEY=<tu-clave-secreta-de-32-caracteres>
+
+# Base de datos — Railway las inyecta automáticamente con sintaxis ${{}}
+DATABASE_URL=${{Postgres.DATABASE_URL}}
+REDIS_URL=${{Redis.REDIS_URL}}
+
+# Neo4j (desde Neo4j Aura)
+SYNKDATA_NEO4J_URI=bolt+s://<id>.databases.neo4j.io
+SYNKDATA_NEO4J_USER=neo4j
+SYNKDATA_NEO4J_PASSWORD=<tu-password>
+
+# CORS — permite tu dominio Railway
+SYNKDATA_CORS_ORIGINS=["https://synkdata-production.up.railway.app"]
+
+# Admin inicial (se crea automáticamente en el primer deploy via Procfile release)
+SYNKDATA_ADMIN_EMAIL=admin@tudominio.com
+SYNKDATA_ADMIN_PASSWORD=<contraseña-segura-de-al-menos-12-caracteres>
+SYNKDATA_ADMIN_NAME=Administrador SynkData
+
+# Logging
+SYNKDATA_LOG_LEVEL=INFO
+
+# APIs externas (opcionales al inicio)
+SYNKDATA_HIBP_API_KEY=
+SYNKDATA_HUNTER_API_KEY=
+SYNKDATA_RENAPO_API_KEY=
+SYNKDATA_SAT_API_KEY=
+```
+
+> **Importante**: Railway detecta automáticamente `DATABASE_URL` y `REDIS_URL` (sin prefijo `SYNKDATA_`). El `config.py` está preparado para leer ambos formatos.
+
+#### 4. Desplegar
+
+Railway detectará `railway.json` y `nixpacks.toml` automáticamente y:
+1. Instalará Python 3.12 + Tesseract OCR + Poppler (para OCR de documentos).
+2. Instalará dependencias con `pip install -r requirements.txt`.
+3. Ejecutará `alembic upgrade head` (migraciones).
+4. Creará el admin inicial usando `SYNKDATA_ADMIN_EMAIL` y `SYNKDATA_ADMIN_PASSWORD`.
+5. Levantará la app con `uvicorn app.main:app --host 0.0.0.0 --port $PORT`.
+
+#### 5. Verificar el despliegue
+
+1. Railway asignará una URL como `https://synkdata-production.up.railway.app`.
+2. Visita `https://tu-app.up.railway.app/health` → debe retornar `"status": "healthy"`.
+3. Visita `https://tu-app.up.railway.app/` → verás la landing page.
+4. Inicia sesión en `https://tu-app.up.railway.app/login` con las credenciales de admin.
+
+### Configurar dominio personalizado
+
+En Railway: **Settings** → **Networking** → **Generate Domain** o añade tu dominio propio con CNAME.
+
+### Comandos útiles de Railway CLI
+
+```bash
+# Instalar CLI
+npm install -g @railway/cli
+
+# Login
+railway login
+
+# Link al proyecto
+railway link
+
+# Ver logs en vivo
+railway logs
+
+# Ejecutar migraciones manualmente
+railway run alembic upgrade head
+
+# Crear admin manualmente
+railway run python scripts/create_admin.py --interactive
+
+# Abrir shell
+railway shell
+
+# Variables de entorno locales (para desarrollo)
+railway run uvicorn app.main:app --reload
+```
+
+### Troubleshooting Railway
+
+| Problema | Solución |
+|----------|----------|
+| `ModuleNotFoundError: No module named 'app'` | Asegúrate de que el **Root Directory** en Railway sea `/` (la raíz del repo). |
+| `Could not connect to Postgres` | Verifica que `DATABASE_URL` esté configurada como `${{Postgres.DATABASE_URL}}`. |
+| `alembic upgrade head` falla | Ejecuta `railway run alembic upgrade head` para ver el error. Las migraciones son idempotentes — se pueden re-ejecutar. |
+| Login admin no funciona | Verifica que el **release command** del Procfile (`python scripts/create_admin.py ...`) se haya ejecutado. Revisa los logs del primer deploy. |
+| 502 Bad Gateway | La app tarda en arrancar. Espera 1-2 minutos y recarga. Si persiste, revisa logs. |
+| OCR no funciona | Tesseract se instala vía `nixpacks.toml`. Verifica `TESSDATA_PREFIX=/usr/share/tesseract-ocr/5/tessdata` en Variables. |
+
+### Costo estimado en Railway
+
+| Recurso | Plan sugerido | Costo aprox. |
+|---------|---------------|--------------|
+| Web Service (API) | Hobby ($5/mo) oUsage-based | $5-20/mo |
+| PostgreSQL | Hobby 1GB | $5/mo |
+| Redis | Hobby 100MB | $5/mo |
+| **Total** | | **~$15-30/mo** |
+
+> Neo4j Aura Free tier incluye 200K nodos / 400K relaciones — suficiente para empezar.
 
 ---
 

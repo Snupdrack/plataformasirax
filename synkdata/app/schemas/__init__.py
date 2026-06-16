@@ -5,6 +5,19 @@ Centraliza la importación de todos los esquemas para facilitar
 su uso en los routers y servicios de la aplicación.
 """
 
+from app.schemas.user import (
+    AccessRequestCreate,
+    AccessRequestResponse,
+    AccessRequestSummary,
+    AdminCreateUserRequest,
+    AdminReviewRequest,
+    AuthStatus,
+    ChangePasswordRequest,
+    LoginRequest,
+    TokenResponse,
+    UpdateUserRequest,
+    UserResponse,
+)
 from app.schemas.verification import (
     ConsistencyResult,
     CurpCandidate,
@@ -56,6 +69,18 @@ from app.schemas.identity import (
 )
 
 __all__ = [
+    # User / Auth schemas
+    "AccessRequestCreate",
+    "AccessRequestResponse",
+    "AccessRequestSummary",
+    "AdminCreateUserRequest",
+    "AdminReviewRequest",
+    "AuthStatus",
+    "ChangePasswordRequest",
+    "LoginRequest",
+    "TokenResponse",
+    "UpdateUserRequest",
+    "UserResponse",
     # Verification schemas
     "ConsistencyResult",
     "CurpCandidate",

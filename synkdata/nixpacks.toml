@@ -1,0 +1,25 @@
+[phases.setup]
+nixPkgs = ["python312", "tesseract4", "tesseract4-tessdata-eng", "tesseract4-tessdata-spa", "poppler_utils"]
+aptPkgs = ["libpq-dev", "gcc", "g++", "tesseract-ocr", "tesseract-ocr-eng", "tesseract-ocr-spa", "poppler-utils"]
+
+[phases.install]
+cmds = [
+  "python -m venv /opt/venv",
+  ". /opt/venv/bin/activate",
+  "pip install --upgrade pip",
+  "pip install -r requirements.txt"
+]
+
+[phases.build]
+cmds = [
+  ". /opt/venv/bin/activate",
+  "alembic upgrade head || true"
+]
+
+[start]
+cmd = ". /opt/venv/bin/activate && uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 2"
+
+[variables]
+PYTHONUNBUFFERED = "1"
+PYTHONPATH = "/app"
+TESSDATA_PREFIX = "/usr/share/tesseract-ocr/5/tessdata"

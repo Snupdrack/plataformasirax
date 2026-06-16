@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from redis.asyncio import Redis
 
 from app.dependencies import redis_client
@@ -179,7 +179,7 @@ async def search_curp(
     },
 )
 async def get_cached_curp_validation(
-    curp: str = Query(
+    curp: str = Path(
         ...,
         min_length=18,
         max_length=18,

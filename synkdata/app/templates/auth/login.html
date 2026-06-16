@@ -1,0 +1,209 @@
+{# =============================================================================
+   SynkData — Login page (shared by CLIENT and ADMIN; role auto-detected)
+   --------------------------------------------------------------------------
+   Layout: centered split card
+     · Left:  branding panel (navy → blue gradient + logo + tagline)
+     · Right: login form (email/password with show/hide, loading, error)
+   ========================================================================== #}
+{% extends "base.html" %}
+
+{% block title %}Iniciar sesión — SynkData{% endblock %}
+{% block og_title %}Iniciar sesión — SynkData{% endblock %}
+
+{% block navbar %}{% endblock %}
+{% block footer %}{% endblock %}
+{% block main_class %}min-h-screen{% endblock %}
+
+{% block head_extra %}
+<style>
+  [x-cloak] { display: none !important; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex"
+     x-data="loginForm('{{ next_path or '' }}')"
+     x-init="init()">
+
+  {# ─── Left: branding panel ──────────────────────────────────────────── #}
+  <aside class="relative hidden lg:flex lg:w-[46%] xl:w-[42%] sd-mesh-bg text-white overflow-hidden">
+    <div class="absolute inset-0 sd-grid-bg opacity-50"></div>
+
+    {# Decorative orbs #}
+    <div class="absolute -top-24 -right-24 h-72 w-72 rounded-full bg-accent/20 blur-3xl"></div>
+    <div class="absolute bottom-0 -left-24 h-72 w-72 rounded-full bg-brand/30 blur-3xl"></div>
+
+    <div class="relative z-10 flex flex-col justify-between p-12 xl:p-16 w-full">
+      {# Logo + wordmark #}
+      <a href="/" class="inline-flex items-center gap-3 self-start">
+        <img src="/static/img/logo.svg" alt="" class="h-10 w-10" />
+        <span class="text-xl font-bold tracking-tight">Synk<span class="text-accent">Data</span></span>
+      </a>
+
+      {# Tagline + supporting copy #}
+      <div class="max-w-md">
+        <h1 class="text-3xl xl:text-4xl font-bold leading-tight tracking-tight">
+          Inteligencia de Identidad para México y LATAM
+        </h1>
+        <p class="mt-4 text-white/75 leading-relaxed">
+          Verificación KYC/AML, scoring de riesgo y cumplimiento normativo
+          en una sola plataforma. Diseñado para equipos de cumplimiento que
+          requieren precisión y velocidad.
+        </p>
+
+        {# Feature bullets #}
+        <ul class="mt-8 space-y-3">
+          <li class="flex items-center gap-3 text-sm text-white/85">
+            <span class="h-6 w-6 rounded-full bg-accent/15 border border-accent/40 flex items-center justify-center flex-shrink-0">
+              <svg class="h-3.5 w-3.5 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            </span>
+            Validación oficial contra RENAPO y SAT
+          </li>
+          <li class="flex items-center gap-3 text-sm text-white/85">
+            <span class="h-6 w-6 rounded-full bg-accent/15 border border-accent/40 flex items-center justify-center flex-shrink-0">
+              <svg class="h-3.5 w-3.5 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            </span>
+            Screening en listas OFAC, Interpol y OpenSanctions
+          </li>
+          <li class="flex items-center gap-3 text-sm text-white/85">
+            <span class="h-6 w-6 rounded-full bg-accent/15 border border-accent/40 flex items-center justify-center flex-shrink-0">
+              <svg class="h-3.5 w-3.5 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            </span>
+            Motor de scoring con factores y mitigantes
+          </li>
+        </ul>
+      </div>
+
+      {# Bottom badge #}
+      <div class="flex items-center gap-3 text-xs text-white/60">
+        <span class="sd-pulse-dot"></span>
+        <span>Plataforma certificada · ISO 27001 · Cumplimiento KYC/AML</span>
+      </div>
+    </div>
+  </aside>
+
+  {# ─── Right: login form ─────────────────────────────────────────────── #}
+  <section class="flex-1 flex flex-col items-center justify-center px-6 py-12 sm:px-12 bg-slate-50">
+    <div class="w-full max-w-md">
+
+      {# Mobile logo (visible only on small screens) #}
+      <a href="/" class="lg:hidden flex items-center gap-2.5 justify-center mb-8">
+        <img src="/static/img/logo.svg" alt="" class="h-10 w-10" />
+        <span class="text-xl font-bold tracking-tight text-navy">Synk<span class="text-brand">Data</span></span>
+      </a>
+
+      <header class="mb-8">
+        <h2 class="text-2xl font-bold tracking-tight text-navy">Iniciar sesión</h2>
+        <p class="mt-1.5 text-sm text-slatey">
+          Acceda a su panel de inteligencia de identidad.
+        </p>
+      </header>
+
+      {# Error alert #}
+      <div x-show="error" x-cloak x-transition
+           class="mb-5 flex items-start gap-3 rounded-sd border border-danger/30 bg-danger-soft px-4 py-3"
+           role="alert" aria-live="assertive">
+        <svg class="h-5 w-5 flex-shrink-0 text-danger mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium text-danger">No se pudo iniciar sesión</p>
+          <p class="text-xs text-danger/90 mt-0.5" x-text="error"></p>
+        </div>
+        <button @click="error=''" class="text-danger/70 hover:text-danger" aria-label="Cerrar">
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      {# Login form #}
+      <form @submit.prevent="submit()" novalidate class="space-y-5">
+        {# Email #}
+        <div>
+          <label for="email" class="sd-label">Correo electrónico</label>
+          <div class="relative">
+            <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slatey">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            </span>
+            <input id="email" type="email" autocomplete="email" required
+                   x-model="email" :class="{ 'sd-input-error': email && !emailValid }"
+                   class="sd-input pl-10"
+                   placeholder="nombre@empresa.com"
+                   aria-describedby="email-help" />
+          </div>
+          <p x-show="email && !emailValid" x-cloak class="mt-1 text-xs text-danger">
+            Ingrese un correo electrónico válido.
+          </p>
+        </div>
+
+        {# Password #}
+        <div>
+          <label for="password" class="sd-label">Contraseña</label>
+          <div class="relative">
+            <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slatey">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            </span>
+            <input id="password" :type="showPassword ? 'text' : 'password'"
+                   autocomplete="current-password" required
+                   x-model="password" class="sd-input pl-10 pr-11"
+                   placeholder="••••••••" />
+            <button type="button"
+                    @click="showPassword = !showPassword"
+                    class="absolute inset-y-0 right-0 pr-3 flex items-center text-slatey hover:text-navy transition"
+                    :aria-label="showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'">
+              <svg x-show="!showPassword" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg x-show="showPassword" x-cloak class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+            </button>
+          </div>
+        </div>
+
+        {# Remember + forgot #}
+        <div class="flex items-center justify-between text-sm">
+          <label class="inline-flex items-center gap-2 text-slatey cursor-pointer">
+            <input type="checkbox" class="rounded border-slate-300 text-brand focus:ring-brand" />
+            Recordarme
+          </label>
+          <a href="#" class="font-medium text-brand hover:text-brand-700 transition">¿Olvidó su contraseña?</a>
+        </div>
+
+        {# Submit #}
+        <button type="submit" :disabled="loading || !formValid"
+                class="sd-btn sd-btn-primary w-full py-2.5 text-[0.95rem]">
+          <template x-if="!loading">
+            <span class="flex items-center gap-2">
+              Iniciar sesión
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+            </span>
+          </template>
+          <template x-if="loading">
+            <span class="flex items-center gap-2">
+              <span class="sd-spinner"></span>
+              Verificando credenciales…
+            </span>
+          </template>
+        </button>
+      </form>
+
+      {# Footer of card #}
+      <div class="mt-8 pt-6 border-t border-slate-200 text-center text-sm">
+        <p class="text-slatey">
+          ¿No tiene cuenta aún?
+          <a href="/#access" class="font-semibold text-brand hover:text-brand-700 transition">
+            Solicitar acceso
+          </a>
+        </p>
+        <p class="mt-4 text-xs text-slatey/80">
+          Al iniciar sesión acepta nuestros
+          <a href="#" class="underline hover:text-navy">Términos</a> y
+          <a href="#" class="underline hover:text-navy">Política de Privacidad</a>.
+        </p>
+      </div>
+
+      {# Security note #}
+      <div class="mt-6 flex items-center justify-center gap-2 text-xs text-slatey/70">
+        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Conexión cifrada TLS 1.3 · Autenticación JWT
+      </div>
+    </div>
+  </section>
+</div>
+{% endblock %}

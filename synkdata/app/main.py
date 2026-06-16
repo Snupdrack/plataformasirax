@@ -12,14 +12,19 @@ Este módulo configura y arranca la aplicación FastAPI, incluyendo:
 from __future__ import annotations
 
 import logging
+import os
 import time
 import uuid
 from contextlib import asynccontextmanager
+from datetime import datetime
+from pathlib import Path
 from typing import AsyncGenerator
 
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 
 from app.config import Environment, get_settings
 from app.database import (
@@ -115,6 +120,23 @@ def create_app() -> FastAPI:
         else None,
         lifespan=lifespan,
     )
+
+    # ── Archivos estáticos y plantillas Jinja2 ───────────────────────────
+    base_dir = Path(__file__).resolve().parent
+    static_dir = base_dir / "static"
+    templates_dir = base_dir / "templates"
+
+    if static_dir.exists():
+        app.mount(
+            "/static",
+            StaticFiles(directory=str(static_dir)),
+            name="static",
+        )
+
+    templates = Jinja2Templates(directory=str(templates_dir))
+    templates.env.globals["now"] = datetime.now
+    templates.env.globals["app_name"] = settings.APP_NAME
+    templates.env.globals["app_version"] = settings.APP_VERSION
 
     # ── Middleware CORS ───────────────────────────────────────────────────
     app.add_middleware(
@@ -272,13 +294,57 @@ def create_app() -> FastAPI:
         return {"status": "ready", "services": db_health}
 
     @app.get("/", tags=["Raíz"], include_in_schema=False)
-    async def root():
-        """Redirige a la documentación de la API."""
-        return {
-            "name": settings.APP_NAME,
-            "version": settings.APP_VERSION,
-            "docs": f"{settings.API_PREFIX}/docs",
-        }
+    async def root(request: Request):
+        """Sirve la landing page de SynkData."""
+        return templates.TemplateResponse(
+            request,
+            "landing.html",
+            {"title": "SynkData — Inteligencia de Identidad para México y LATAM"},
+        )
+
+    @app.get("/login", tags=["Auth"], include_in_schema=False, response_class=HTMLResponse)
+    async def login_page(request: Request):
+        """Página de inicio de sesión para clientes y administradores."""
+        return templates.TemplateResponse(
+            request,
+            "auth/login.html",
+            {"title": "Iniciar sesión — SynkData"},
+        )
+
+    @app.get("/dashboard", tags=["Dashboard"], include_in_schema=False, response_class=HTMLResponse)
+    async def dashboard_page(request: Request):
+        """Dashboard del cliente (verificación, scoring, analítica)."""
+        return templates.TemplateResponse(
+            request,
+            "dashboard/index.html",
+            {"title": "Dashboard — SynkData"},
+        )
+
+    @app.get(
+        "/dashboard/verification/{verification_id}",
+        tags=["Dashboard"],
+        include_in_schema=False,
+        response_class=HTMLResponse,
+    )
+    async def verification_detail_page(request: Request, verification_id: str):
+        """Detalle de una verificación individual."""
+        return templates.TemplateResponse(
+            request,
+            "dashboard/verification_detail.html",
+            {
+                "title": "Detalle de verificación — SynkData",
+                "verification_id": verification_id,
+            },
+        )
+
+    @app.get("/admin", tags=["Admin"], include_in_schema=False, response_class=HTMLResponse)
+    async def admin_panel_page(request: Request):
+        """Panel de administración (solo rol ADMIN)."""
+        return templates.TemplateResponse(
+            request,
+            "admin/panel.html",
+            {"title": "Panel de Administración — SynkData"},
+        )
 
     # ── Routers ───────────────────────────────────────────────────────────
     _register_routers(app)
@@ -294,9 +360,25 @@ def _register_routers(app: FastAPI) -> None:
     Los routers se importan de forma diferida para evitar importaciones
     circulares y permitir que cada módulo se cargue independientemente.
     """
-    from app.routers import analytics, curp, identity, risk, rfc, screening, verify
+    from app.routers import (
+        access,
+        admin,
+        analytics,
+        auth,
+        curp,
+        dashboard,
+        identity,
+        risk,
+        rfc,
+        screening,
+        verify,
+    )
 
     routers = [
+        (access.router, "access", "Acceso — Landing Page y Solicitudes"),
+        (auth.router, "auth", "Autenticación — Login y Perfil"),
+        (admin.router, "admin", "Administración — Usuarios y Solicitudes"),
+        (dashboard.router, "dashboard", "Dashboard — Cliente"),
         (verify.router, "verify", "Verificación de Identidad"),
         (curp.router, "curp", "CURP — Registro Nacional de Población"),
         (rfc.router, "rfc", "RFC — Registro Federal de Contribuyentes"),

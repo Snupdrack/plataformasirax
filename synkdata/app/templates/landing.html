@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SynkData — Inteligencia de Identidad</title>
+    <style>
+        :root {
+            --primary: #0a4d8c;
+            --primary-dark: #073964;
+            --accent: #00c2a8;
+            --bg: #f5f7fa;
+            --text: #1f2937;
+            --muted: #6b7280;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+        header {
+            background: var(--primary);
+            color: white;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        header h1 { margin: 0; font-size: 1.4rem; }
+        header a {
+            color: white;
+            text-decoration: none;
+            background: var(--accent);
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+        .hero {
+            text-align: center;
+            padding: 4rem 2rem 2rem;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+        }
+        .hero h2 { font-size: 2.5rem; margin-bottom: 1rem; }
+        .hero p { font-size: 1.2rem; max-width: 700px; margin: 0 auto 2rem; opacity: 0.9; }
+        .container { max-width: 800px; margin: 3rem auto; padding: 0 2rem; }
+        form {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+        .form-group { margin-bottom: 1rem; }
+        label { display: block; margin-bottom: 0.3rem; font-weight: 500; }
+        input, textarea, select {
+            width: 100%;
+            padding: 0.7rem;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+        textarea { min-height: 100px; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        button {
+            background: var(--primary);
+            color: white;
+            padding: 0.8rem 1.5rem;
+            border: none;
+            border-radius: 4px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 1rem;
+        }
+        button:hover { background: var(--primary-dark); }
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin: 3rem 0;
+        }
+        .feature {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .feature h3 { color: var(--primary); margin-top: 0; }
+        footer {
+            text-align: center;
+            padding: 2rem;
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>SynkData</h1>
+        <a href="/api/v1/auth/login">Iniciar sesión</a>
+    </header>
+
+    <section class="hero">
+        <h2>Inteligencia de Identidad para México y LATAM</h2>
+        <p>Verificación de identidad, antecedentes, cumplimiento normativo KYC/AML y
+           análisis de riesgo en una sola plataforma.</p>
+    </section>
+
+    <div class="container">
+        <div class="features">
+            <div class="feature">
+                <h3>CURP & RFC</h3>
+                <p>Validación oficial contra RENAPO y SAT.</p>
+            </div>
+            <div class="feature">
+                <h3>Screening</h3>
+                <p>Listas restrictivas OFAC, Interpol, OpenSanctions.</p>
+            </div>
+            <div class="feature">
+                <h3>Riesgo</h3>
+                <p>Motor de scoring con factores y mitigantes.</p>
+            </div>
+            <div class="feature">
+                <h3>Analítica</h3>
+                <p>Dashboards ejecutivos en tiempo real.</p>
+            </div>
+        </div>
+
+        <form id="accessForm" action="/api/v1/access/request" method="POST">
+            <h2>Solicitar acceso a la plataforma</h2>
+            <p style="color: var(--muted);">Complete el formulario y un administrador
+               revisará su solicitud.</p>
+
+            <div class="form-group">
+                <label for="full_name">Nombre completo *</label>
+                <input type="text" id="full_name" name="full_name" required>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="email">Correo electrónico *</label>
+                    <input type="email" id="email" name="email" required>
+                </div>
+                <div class="form-group">
+                    <label for="phone">Teléfono *</label>
+                    <input type="tel" id="phone" name="phone" required>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="company">Empresa</label>
+                    <input type="text" id="company" name="company">
+                </div>
+                <div class="form-group">
+                    <label for="position">Cargo</label>
+                    <input type="text" id="position" name="position">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="curp">CURP (opcional)</label>
+                    <input type="text" id="curp" name="curp" maxlength="18">
+                </div>
+                <div class="form-group">
+                    <label for="rfc">RFC (opcional)</label>
+                    <input type="text" id="rfc" name="rfc" maxlength="13">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="use_case">Caso de uso *</label>
+                <textarea id="use_case" name="use_case" required
+                    placeholder="Describa cómo planea utilizar la plataforma..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="expected_volume">Volumen esperado (verificaciones/mes)</label>
+                <input type="number" id="expected_volume" name="expected_volume" min="0">
+            </div>
+
+            <button type="submit">Enviar solicitud</button>
+        </form>
+    </div>
+
+    <footer>
+        &copy; 2024 SynkData Identity Intelligence Platform.
+    </footer>
+
+    <script>
+        document.getElementById('accessForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const form = e.target;
+            const data = Object.fromEntries(new FormData(form).entries());
+            if (data.expected_volume) data.expected_volume = parseInt(data.expected_volume);
+            else delete data.expected_volume;
+
+            try {
+                const resp = await fetch('/api/v1/access/request', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data),
+                });
+                if (resp.ok) {
+                    window.location.href = '/api/v1/access/success';
+                } else {
+                    const err = await resp.json();
+                    alert('Error: ' + (err.detail || 'No se pudo enviar la solicitud.'));
+                }
+            } catch (err) {
+                alert('Error de red: ' + err.message);
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="SynkData">
+  <defs>
+    <linearGradient id="sd-grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0A0E27"/>
+      <stop offset="55%" stop-color="#2563EB"/>
+      <stop offset="100%" stop-color="#00D9FF"/>
+    </linearGradient>
+    <linearGradient id="sd-grad-soft" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2563EB"/>
+      <stop offset="100%" stop-color="#00D9FF"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Shield silhouette -->
+  <path d="M32 3 L57 11 V31 C57 46 46 56 32 61 C18 56 7 46 7 31 V11 Z"
+        fill="url(#sd-grad)" stroke="url(#sd-grad-soft)" stroke-width="1.2" stroke-linejoin="round"/>
+
+  <!-- Inner shield highlight -->
+  <path d="M32 8 L52 14 V31 C52 43 43 51 32 55 C21 51 12 43 12 31 V14 Z"
+        fill="#0A0E27" opacity="0.55"/>
+
+  <!-- Stylized S glyph -->
+  <path d="M39 22 C37 19 34 18 30 18 C25 18 22 21 22 25 C22 29 26 30 30 31 C34 32 39 33 39 38 C39 43 35 46 30 46 C26 46 22 44 20 41"
+        fill="none" stroke="url(#sd-grad-soft)" stroke-width="4"
+        stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Checkmark accent -->
+  <path d="M27 51 L30.5 54.5 L37 48"
+        fill="none" stroke="#00D9FF" stroke-width="3"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -73,6 +73,10 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    # ── Compatibilidad con Railway / Heroku ────────────────────────────────
+    # Railway expone variables como DATABASE_URL, REDIS_URL, etc. (sin prefijo).
+    # Estas aliases permiten que la app funcione con o sin el prefijo SYNKDATA_.
+
     # ── Aplicación ────────────────────────────────────────────────────────
     ENV: Environment = Environment.DEVELOPMENT
     DEBUG: bool = False
@@ -99,6 +103,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = Field(
         default="postgresql+asyncpg://synkdata:synkdata@localhost:5432/synkdata",
         description="URL de conexión asíncrona a PostgreSQL.",
+        validation_alias="DATABASE_URL",
     )
     DATABASE_POOL_SIZE: int = 20
     DATABASE_MAX_OVERFLOW: int = 10
@@ -109,6 +114,7 @@ class Settings(BaseSettings):
     REDIS_URL: str = Field(
         default="redis://localhost:6379/0",
         description="URL de conexión a Redis para caché y rate-limiting.",
+        validation_alias="REDIS_URL",
     )
     REDIS_CACHE_TTL: int = Field(
         default=300,
@@ -280,12 +286,20 @@ class Settings(BaseSettings):
         En entornos de desarrollo, reemplaza el driver asyncpg por el
         equivalente sincrónico cuando sea necesario (ej. Alembic).
         """
-        return self.DATABASE_URL
+        url = self.DATABASE_URL
+        # Railway/Heroku exponen postgres:// — convertir al driver asyncpg
+        if url.startswith("postgres://"):
+            url = url.replace("postgres://", "postgresql+asyncpg://", 1)
+        elif url.startswith("postgresql://") and "+asyncpg" not in url:
+            url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return url
 
     @property
     def sync_database_url(self) -> str:
         """URL síncrona para Alembic y herramientas de migración."""
-        return self.DATABASE_URL.replace("+asyncpg", "+psycopg2")
+        url = self.effective_database_url.replace("+asyncpg", "+psycopg2")
+        # En Railway la URL puede incluir ?sslmode=require que psycopg2 acepta
+        return url
 
     @property
     def rate_limit_storage_url(self) -> str:

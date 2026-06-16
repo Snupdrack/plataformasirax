@@ -1,0 +1,34 @@
+# SynkData Identity Intelligence Platform — Railway Config
+# Documentación: https://docs.railway.app
+
+[build]
+builder = "NIXPACKS"
+watchPatterns = ["/app/**/*.py", "/requirements.txt", "/app/templates/**", "/app/static/**"]
+
+[deploy]
+startCommand = "uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 2"
+healthcheckPath = "/health"
+healthcheckTimeout = 100
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+sleepApplication = false
+multiRegion = false
+
+# ── Variables de entorno (se configuran en Railway Dashboard o CLI) ─────────
+# SYNKDATA_ENV                          = production
+# SYNKDATA_SECRET_KEY                   = <genera-una-clave-secreta-larga>
+# SYNKDATA_API_PREFIX                   = /api/v1
+# SYNKDATA_DATABASE_URL                 = ${{Postgres.DATABASE_URL}}/synkdata?sslmode=require
+#   (Railway inyecta Postgres.DATABASE_URL al crear el servicio PostgreSQL)
+#   Nota: hay que cambiar el esquema de postgres:// a postgresql+asyncpg://
+# SYNKDATA_REDIS_URL                    = ${{Redis.REDIS_URL}}
+# SYNKDATA_NEO4J_URI                    = ${{Neo4j.NEO4J_URI}}
+# SYNKDATA_NEO4J_USER                   = ${{Neo4j.NEO4J_USER}}
+# SYNKDATA_NEO4J_PASSWORD               = ${{Neo4j.NEO4J_PASSWORD}}
+# SYNKDATA_CORS_ORIGINS                 = ["https://synkdata.up.railway.app"]
+# SYNKDATA_ADMIN_EMAIL                  = admin@synkdata.mx
+# SYNKDATA_ADMIN_PASSWORD               = <contraseña-segura>
+# SYNKDATA_HIBP_API_KEY                 = <opcional>
+# SYNKDATA_HUNTER_API_KEY               = <opcional>
+# SYNKDATA_RENAPO_API_KEY               = <opcional>
+# SYNKDATA_SAT_API_KEY                  = <opcional>

@@ -16,7 +16,12 @@ from app.models.base import Base, SoftDeleteMixin, TimestampMixin
 # Descomentar a medida que se implementen los modelos.
 # ---------------------------------------------------------------------------
 
-# from app.models.user import User
+from app.models.user import (
+    AccessRequest,
+    AccessRequestStatus,
+    User,
+    UserRole,
+)
 from app.models.verification import CurpValidation, RfcValidation, VerificationRequest
 from app.models.screening import (
     ScreeningMatch,
@@ -52,12 +57,20 @@ __all__ = [
     "Base",
     "TimestampMixin",
     "SoftDeleteMixin",
+    # Users & access
+    "User",
+    "UserRole",
+    "AccessRequest",
+    "AccessRequestStatus",
+    # Verification
     "CurpValidation",
     "RfcValidation",
     "VerificationRequest",
+    # Screening
     "ScreeningMatch",
     "ScreeningRequest",
     "WatchlistEntry",
+    # Digital intelligence
     "AnalysisStatus",
     "DigitalIntelligenceRequest",
     "DomainReputation",
@@ -65,9 +78,11 @@ __all__ = [
     "LineType",
     "PhoneAnalysis",
     "UsernameAnalysis",
+    # Identity
     "IdentityCorrelation",
     "RecommendationType",
     "RiskAssessment",
+    # Analytics
     "Alert",
     "AlertSeverity",
     "AlertType",

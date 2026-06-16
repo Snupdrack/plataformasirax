@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from redis.asyncio import Redis
 
 from app.dependencies import redis_client
@@ -175,7 +175,7 @@ async def verify_rfc_sat(
     },
 )
 async def get_cached_rfc_validation(
-    rfc: str = Query(
+    rfc: str = Path(
         ...,
         min_length=12,
         max_length=13,

@@ -1,0 +1,989 @@
+{# =============================================================================
+   SynkData — Client dashboard
+   --------------------------------------------------------------------------
+   Sidebar: Resumen / Verificaciones / Análisis de Riesgo / Nueva
+            Verificación / Mi Cuenta
+   Stats:   Verificaciones Realizadas · Tasa de Aprobación · Riesgo
+            Promedio · Última Verificación
+   Charts:  risk distribution donut (Chart.js)
+   ========================================================================== #}
+{% extends "base.html" %}
+
+{% block title %}Dashboard — SynkData{% endblock %}
+{% block og_title %}Dashboard — SynkData{% endblock %}
+
+{% block navbar %}{% endblock %}
+{% block footer %}{% endblock %}
+{% block main_class %}{% endblock %}
+
+{% block chartjs %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="/static/js/charts.js"></script>
+{% endblock %}
+
+{% block head_extra %}
+<style>[x-cloak] { display: none !important; }</style>
+{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex bg-slate-50"
+     x-data="clientDashboard({{ user | tojson if user else 'null' }})"
+     x-init="init()" x-cloak>
+
+  {# ─── Sidebar (desktop) ─────────────────────────────────────────────── #}
+  <aside class="hidden lg:flex flex-col w-64 bg-navy text-white flex-shrink-0 sticky top-0 h-screen">
+    <div class="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+      <a href="/" class="flex items-center gap-2.5 px-3 py-3 mb-4">
+        <img src="/static/img/logo.svg" alt="" class="h-8 w-8" />
+        <span class="text-base font-bold tracking-tight">Synk<span class="text-accent">Data</span></span>
+      </a>
+
+      <p class="px-3 py-2 text-[0.65rem] uppercase tracking-wider text-white/40 font-semibold">Plataforma</p>
+
+      <button class="sd-nav-link w-full text-left" :class="{ 'sd-active': activeTab === 'overview' }" @click="switchTab('overview')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+        Resumen
+      </button>
+      <button class="sd-nav-link w-full text-left" :class="{ 'sd-active': activeTab === 'verifications' }" @click="switchTab('verifications')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        Verificaciones
+      </button>
+      <button class="sd-nav-link w-full text-left" :class="{ 'sd-active': activeTab === 'risk' }" @click="switchTab('risk')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Análisis de Riesgo
+      </button>
+      <button class="sd-nav-link w-full text-left" :class="{ 'sd-active': activeTab === 'new' }" @click="switchTab('new')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+        Nueva Verificación
+      </button>
+      <button class="sd-nav-link w-full text-left" :class="{ 'sd-active': activeTab === 'account' }" @click="switchTab('account')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        Mi Cuenta
+      </button>
+
+      <div class="pt-6 mt-6 border-t border-white/10 px-3">
+        <button @click="openVerifyModal()" class="sd-btn sd-btn-accent w-full justify-center">
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Nueva verificación
+        </button>
+      </div>
+    </div>
+
+    {# Bottom: user mini-card #}
+    <div class="border-t border-white/10 p-3">
+      <div class="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-white/5 transition">
+        <span class="h-9 w-9 rounded-full bg-gradient-to-br from-accent to-brand text-navy text-xs font-bold flex items-center justify-center flex-shrink-0"
+              x-text="user ? (user.full_name || 'U').substring(0,1).toUpperCase() : 'U'"></span>
+        <div class="min-w-0 flex-1">
+          <p class="text-sm font-semibold truncate" x-text="user?.full_name || 'Usuario'"></p>
+          <p class="text-[0.7rem] uppercase tracking-wide text-brand-300 font-semibold" x-text="user?.role || 'CLIENT'"></p>
+        </div>
+        <button @click="doLogout()" class="text-white/60 hover:text-white" aria-label="Cerrar sesión" title="Cerrar sesión">
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  {# ─── Mobile sidebar drawer ─────────────────────────────────────────── #}
+  <div x-show="mobileSidebarOpen" x-cloak x-transition.opacity class="lg:hidden fixed inset-0 z-50 flex">
+    <div class="absolute inset-0 bg-navy/60 backdrop-blur-sm" @click="mobileSidebarOpen=false"></div>
+    <aside class="relative w-72 bg-navy text-white flex flex-col" x-show="mobileSidebarOpen" x-transition>
+      <div class="flex items-center justify-between px-4 py-4 border-b border-white/10">
+        <div class="flex items-center gap-2.5">
+          <img src="/static/img/logo.svg" alt="" class="h-8 w-8" />
+          <span class="text-base font-bold">Synk<span class="text-accent">Data</span></span>
+        </div>
+        <button @click="mobileSidebarOpen=false" class="text-white/70 hover:text-white" aria-label="Cerrar menú">
+          <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+        <button class="sd-nav-link w-full" :class="{ 'sd-active': activeTab === 'overview' }" @click="switchTab('overview')">Resumen</button>
+        <button class="sd-nav-link w-full" :class="{ 'sd-active': activeTab === 'verifications' }" @click="switchTab('verifications')">Verificaciones</button>
+        <button class="sd-nav-link w-full" :class="{ 'sd-active': activeTab === 'risk' }" @click="switchTab('risk')">Análisis de Riesgo</button>
+        <button class="sd-nav-link w-full" :class="{ 'sd-active': activeTab === 'new' }" @click="switchTab('new')">Nueva Verificación</button>
+        <button class="sd-nav-link w-full" :class="{ 'sd-active': activeTab === 'account' }" @click="switchTab('account')">Mi Cuenta</button>
+      </div>
+      <div class="border-t border-white/10 p-3">
+        <button @click="doLogout()" class="sd-nav-link w-full text-danger/80 hover:text-danger">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Cerrar sesión
+        </button>
+      </div>
+    </aside>
+  </div>
+
+  {# ─── Main column ───────────────────────────────────────────────────── #}
+  <div class="flex-1 flex flex-col min-w-0">
+
+    {# Top bar #}
+    <header class="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-slate-200">
+      <div class="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
+        <div class="flex items-center gap-3">
+          <button class="lg:hidden p-2 rounded-lg hover:bg-slate-100" @click="mobileSidebarOpen=true" aria-label="Abrir menú">
+            <svg class="h-6 w-6 text-navy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          </button>
+          <div>
+            <h1 class="text-lg font-bold tracking-tight text-navy"
+                x-text="{
+                  overview: 'Resumen',
+                  verifications: 'Verificaciones',
+                  risk: 'Análisis de Riesgo',
+                  new: 'Nueva Verificación',
+                  account: 'Mi Cuenta'
+                }[activeTab]"></h1>
+            <p class="text-xs text-slatey hidden sm:block">
+              <span x-text="user?.company ? user.company + ' · ' : ''"></span>
+              <span x-text="user?.full_name"></span>
+            </p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button @click="openVerifyModal()" class="sd-btn sd-btn-primary sd-btn-sm">
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <span class="hidden sm:inline">Nueva verificación</span>
+            <span class="sm:hidden">Verificar</span>
+          </button>
+          <div class="flex items-center gap-2 pl-2 border-l border-slate-200 ml-1">
+            <span class="h-9 w-9 rounded-full bg-gradient-to-br from-brand to-accent text-white text-xs font-bold flex items-center justify-center"
+                  x-text="user ? (user.full_name || 'U').substring(0,1).toUpperCase() : 'U'"></span>
+            <button @click="doLogout()" class="p-2 rounded-lg text-slatey hover:text-danger hover:bg-danger-soft transition" title="Cerrar sesión" aria-label="Cerrar sesión">
+              <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    {# ─── Content area ────────────────────────────────────────────────── #}
+    <div class="flex-1 p-4 sm:p-6 lg:p-8 space-y-6">
+
+      {# ══════ TAB: RESUMEN ══════ #}
+      <section x-show="activeTab === 'overview'" class="space-y-6 sd-fade-in">
+
+        {# Stats cards #}
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {# Verificaciones Realizadas #}
+          <div class="sd-card sd-stat-card sd-card-hover p-5">
+            <div class="flex items-start justify-between">
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-slatey">Verificaciones Realizadas</p>
+                <template x-if="loadingOverview"><div class="sd-skeleton h-9 w-20 mt-3"></div></template>
+                <p x-show="!loadingOverview" class="text-3xl font-bold text-navy mt-2" x-text="overview?.total_verifications ?? 0"></p>
+              </div>
+              <span class="h-10 w-10 rounded-xl bg-brand/10 text-brand flex items-center justify-center">
+                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+              </span>
+            </div>
+            <p class="mt-3 text-xs text-slatey">
+              <span class="text-brand font-semibold" x-text="overview?.verifications_30d ?? 0"></span> en los últimos 30 días
+            </p>
+          </div>
+
+          {# Tasa de Aprobación #}
+          <div class="sd-card sd-stat-card sd-card-hover p-5">
+            <div class="flex items-start justify-between">
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-slatey">Tasa de Aprobación</p>
+                <template x-if="loadingRisk"><div class="sd-skeleton h-9 w-20 mt-3"></div></template>
+                <p x-show="!loadingRisk" class="text-3xl font-bold text-navy mt-2">
+                  <span x-text="approvalRate"></span><span class="text-base text-slatey">%</span>
+                </p>
+              </div>
+              <span class="h-10 w-10 rounded-xl bg-success/10 text-success flex items-center justify-center">
+                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              </span>
+            </div>
+            <p class="mt-3 text-xs text-slatey">
+              <span class="text-success font-semibold" x-text="riskSummary?.approve_count ?? 0"></span> aprobadas ·
+              <span class="text-warning" x-text="riskSummary?.review_count ?? 0"></span> en revisión
+            </p>
+          </div>
+
+          {# Riesgo Promedio #}
+          <div class="sd-card sd-stat-card sd-card-hover p-5">
+            <div class="flex items-start justify-between">
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-slatey">Riesgo Promedio</p>
+                <template x-if="loadingRisk"><div class="sd-skeleton h-9 w-20 mt-3"></div></template>
+                <p x-show="!loadingRisk" class="text-3xl font-bold mt-2"
+                   :style="`color: ${scoreColor(riskSummary?.average_risk_score || 0, true)}`"
+                   x-text="formatScore(riskSummary?.average_risk_score, { decimals: 0 })"></p>
+              </div>
+              <span class="h-10 w-10 rounded-xl bg-warning/15 text-warning flex items-center justify-center">
+                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              </span>
+            </div>
+            <p class="mt-3 text-xs text-slatey">Escala 0-100 (mayor = más riesgo)</p>
+          </div>
+
+          {# Última Verificación #}
+          <div class="sd-card sd-stat-card sd-card-hover p-5">
+            <div class="flex items-start justify-between">
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-slatey">Última Verificación</p>
+                <template x-if="loadingOverview"><div class="sd-skeleton h-9 w-24 mt-3"></div></template>
+                <p x-show="!loadingOverview" class="text-base font-bold text-navy mt-2"
+                   x-text="overview?.last_verification_at ? formatRelative(overview.last_verification_at) : 'Sin verificaciones'"></p>
+              </div>
+              <span class="h-10 w-10 rounded-xl bg-accent/15 text-accent-700 flex items-center justify-center">
+                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              </span>
+            </div>
+            <p class="mt-3 text-xs text-slatey">
+              <span x-text="overview?.verifications_today ?? 0"></span> verificaciones hoy
+            </p>
+          </div>
+        </div>
+
+        {# Quick actions #}
+        <div class="sd-card p-5">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h2 class="text-base font-bold text-navy">Acciones rápidas</h2>
+              <p class="text-xs text-slatey mt-0.5">Inicie una verificación con un solo clic</p>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <button @click="openVerifyModal({ })" class="group p-4 rounded-xl border border-slate-200 hover:border-brand hover:shadow-sd transition text-left">
+              <span class="h-10 w-10 rounded-lg bg-brand/10 text-brand flex items-center justify-center mb-3 group-hover:scale-105 transition">
+                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              </span>
+              <p class="text-sm font-semibold text-navy">Verificar CURP</p>
+              <p class="text-xs text-slatey mt-0.5">Validación contra RENAPO</p>
+            </button>
+            <button @click="openVerifyModal({ })" class="group p-4 rounded-xl border border-slate-200 hover:border-brand hover:shadow-sd transition text-left">
+              <span class="h-10 w-10 rounded-lg bg-brand/10 text-brand flex items-center justify-center mb-3 group-hover:scale-105 transition">
+                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              </span>
+              <p class="text-sm font-semibold text-navy">Verificar RFC</p>
+              <p class="text-xs text-slatey mt-0.5">Validación contra SAT</p>
+            </button>
+            <button @click="openVerifyModal({ })" class="group p-4 rounded-xl border border-slate-200 hover:border-brand hover:shadow-sd transition text-left">
+              <span class="h-10 w-10 rounded-lg bg-brand/10 text-brand flex items-center justify-center mb-3 group-hover:scale-105 transition">
+                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              </span>
+              <p class="text-sm font-semibold text-navy">Screening</p>
+              <p class="text-xs text-slatey mt-0.5">Listas restrictivas</p>
+            </button>
+            <button @click="openVerifyModal({ })" class="group p-4 rounded-xl bg-gradient-to-br from-navy to-navy-700 text-white hover:shadow-sd-md transition text-left">
+              <span class="h-10 w-10 rounded-lg bg-white/15 text-accent flex items-center justify-center mb-3 group-hover:scale-105 transition">
+                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+              </span>
+              <p class="text-sm font-semibold">Evaluación Completa</p>
+              <p class="text-xs text-white/60 mt-0.5">CURP + RFC + Screening</p>
+            </button>
+          </div>
+        </div>
+
+        {# Risk distribution chart + recent verifications #}
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+          {# Risk distribution donut #}
+          <div class="sd-chart-card">
+            <h2 class="text-sm font-bold text-navy mb-1">Distribución de riesgo</h2>
+            <p class="text-xs text-slatey mb-4">Recomendaciones agregadas</p>
+            <template x-if="loadingRisk">
+              <div class="sd-skeleton h-56 w-full rounded-lg"></div>
+            </template>
+            <template x-if="!loadingRisk && !riskSummary?.total_assessments">
+              <div class="sd-empty-state">
+                <svg class="h-10 w-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
+                <p class="text-sm">Aún no hay datos de riesgo.</p>
+              </div>
+            </template>
+            <div x-show="!loadingRisk && riskSummary?.total_assessments" class="sd-chart-canvas-wrap" style="height: 240px;">
+              <canvas id="risk-distribution-chart"></canvas>
+            </div>
+          </div>
+
+          {# Recent verifications #}
+          <div class="sd-card overflow-hidden lg:col-span-2">
+            <div class="flex items-center justify-between p-5 border-b border-slate-200">
+              <div>
+                <h2 class="text-base font-bold text-navy">Verificaciones recientes</h2>
+                <p class="text-xs text-slatey mt-0.5">Últimas 20 verificaciones realizadas</p>
+              </div>
+              <button class="sd-btn sd-btn-ghost sd-btn-sm" @click="switchTab('verifications')">Ver todas
+                <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+              </button>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="sd-table">
+                <thead>
+                  <tr>
+                    <th>Nombre</th>
+                    <th>Confianza</th>
+                    <th>Riesgo</th>
+                    <th>Recomendación</th>
+                    <th>Fecha</th>
+                  </tr>
+                </thead>
+                <tbody x-show="loadingVerifications" x-cloak x-html="skeletonRows(5, 5)"></tbody>
+                <tbody x-show="!loadingVerifications">
+                  <template x-if="!loadingVerifications && verifications && verifications.length === 0">
+                    <tr><td colspan="5" class="text-center py-12">
+                      <svg class="h-10 w-10 mx-auto mb-2 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                      <p class="text-sm text-slatey">Sin verificaciones aún.</p>
+                      <button @click="openVerifyModal()" class="sd-btn sd-btn-primary sd-btn-sm mt-3">Realizar primera verificación</button>
+                    </td></tr>
+                  </template>
+                  <template x-for="v in verifications.slice(0, 6)" :key="v.id">
+                    <tr class="cursor-pointer" @click="viewVerification(v)">
+                      <td class="font-semibold text-navy" x-text="v.entity_name"></td>
+                      <td>
+                        <span class="font-bold" :style="`color: ${scoreColor(v.trust_score)}`" x-text="formatScore(v.trust_score, { decimals: 0 })"></span>
+                      </td>
+                      <td>
+                        <span class="font-bold" :style="`color: ${scoreColor(v.risk_score, true)}`" x-text="formatScore(v.risk_score, { decimals: 0 })"></span>
+                      </td>
+                      <td>
+                        <span class="sd-badge"
+                              :class="recommendationBadge(v.recommendation).cls"
+                              x-text="recommendationBadge(v.recommendation).label"></span>
+                      </td>
+                      <td class="text-slatey" x-text="formatRelative(v.created_at)"></td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {# ══════ TAB: VERIFICATIONS ══════ #}
+      <section x-show="activeTab === 'verifications'" id="verifications" class="sd-fade-in">
+        <div class="sd-card overflow-hidden">
+          <div class="flex items-center justify-between p-5 border-b border-slate-200">
+            <div>
+              <h2 class="text-base font-bold text-navy">Historial de verificaciones</h2>
+              <p class="text-xs text-slatey mt-0.5">Todas sus verificaciones, ordenadas por fecha</p>
+            </div>
+            <button @click="loadVerifications()" class="sd-btn sd-btn-ghost sd-btn-sm">
+              <svg class="h-3.5 w-3.5" :class="{ 'animate-spin': loadingVerifications }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"/></svg>
+              Refrescar
+            </button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="sd-table">
+              <thead>
+                <tr>
+                  <th>Nombre / Entidad</th>
+                  <th>Tipo</th>
+                  <th>Confianza</th>
+                  <th>Riesgo</th>
+                  <th>Recomendación</th>
+                  <th>Región</th>
+                  <th>Fecha</th>
+                  <th class="text-right">Acción</th>
+                </tr>
+              </thead>
+              <tbody x-show="loadingVerifications" x-cloak x-html="skeletonRows(8, 8)"></tbody>
+              <tbody x-show="!loadingVerifications">
+                <template x-if="!loadingVerifications && verifications && verifications.length === 0">
+                  <tr><td colspan="8" class="text-center py-12">
+                    <svg class="h-10 w-10 mx-auto mb-2 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                    <p class="text-sm text-slatey">Aún no ha realizado verificaciones.</p>
+                    <button @click="openVerifyModal()" class="sd-btn sd-btn-primary sd-btn-sm mt-3">Nueva verificación</button>
+                  </td></tr>
+                </template>
+                <template x-for="v in verifications" :key="v.id">
+                  <tr class="cursor-pointer" @click="viewVerification(v)">
+                    <td class="font-semibold text-navy" x-text="v.entity_name"></td>
+                    <td><span class="sd-badge sd-badge-neutral" x-text="v.entity_type"></span></td>
+                    <td>
+                      <div class="flex items-center gap-2">
+                        <span class="font-bold" :style="`color: ${scoreColor(v.trust_score)}`" x-text="formatScore(v.trust_score, { decimals: 0 })"></span>
+                        <div class="sd-progress w-16"><div class="sd-progress-bar" :style="`width: ${v.trust_score}%; background: ${scoreColor(v.trust_score)}`"></div></div>
+                      </div>
+                    </td>
+                    <td>
+                      <div class="flex items-center gap-2">
+                        <span class="font-bold" :style="`color: ${scoreColor(v.risk_score, true)}`" x-text="formatScore(v.risk_score, { decimals: 0 })"></span>
+                        <div class="sd-progress w-16"><div class="sd-progress-bar" :style="`width: ${v.risk_score}%; background: ${scoreColor(v.risk_score, true)}`"></div></div>
+                      </div>
+                    </td>
+                    <td>
+                      <span class="sd-badge"
+                            :class="recommendationBadge(v.recommendation).cls"
+                            x-text="recommendationBadge(v.recommendation).label"></span>
+                    </td>
+                    <td class="text-slatey" x-text="v.region || '—'"></td>
+                    <td class="text-slatey" x-text="formatDate(v.created_at, { dateOnly: true })"></td>
+                    <td class="text-right">
+                      <button @click.stop="viewVerification(v)" class="sd-btn sd-btn-ghost sd-btn-sm">
+                        Detalle
+                        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                      </button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      {# ══════ TAB: RISK ANALYSIS ══════ #}
+      <section x-show="activeTab === 'risk'" class="space-y-6 sd-fade-in">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {# Risk distribution #}
+          <div class="sd-chart-card">
+            <h2 class="text-sm font-bold text-navy mb-1">Distribución de recomendaciones</h2>
+            <p class="text-xs text-slatey mb-4">Aprobar / Revisar / Rechazar</p>
+            <template x-if="loadingRisk">
+              <div class="sd-skeleton h-64 w-full rounded-lg"></div>
+            </template>
+            <div x-show="!loadingRisk" class="sd-chart-canvas-wrap" style="height: 280px;">
+              <canvas id="risk-distribution-chart-2"></canvas>
+            </div>
+          </div>
+
+          {# Risk summary stats #}
+          <div class="sd-card p-5">
+            <h2 class="text-sm font-bold text-navy mb-4">Resumen de riesgo</h2>
+            <template x-if="loadingRisk">
+              <div class="space-y-3">
+                <div class="sd-skeleton h-12 w-full"></div>
+                <div class="sd-skeleton h-12 w-full"></div>
+                <div class="sd-skeleton h-12 w-full"></div>
+              </div>
+            </template>
+            <template x-if="!loadingRisk && !riskSummary?.total_assessments">
+              <div class="sd-empty-state">
+                <svg class="h-10 w-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+                <p class="text-sm">Sin evaluaciones de riesgo todavía.</p>
+              </div>
+            </template>
+            <dl x-show="!loadingRisk && riskSummary?.total_assessments" class="space-y-3">
+              <div class="flex justify-between items-center py-2 border-b border-slate-100">
+                <dt class="text-sm text-slatey">Total de evaluaciones</dt>
+                <dd class="text-base font-bold text-navy" x-text="riskSummary?.total_assessments ?? 0"></dd>
+              </div>
+              <div class="flex justify-between items-center py-2 border-b border-slate-100">
+                <dt class="text-sm text-slatey">Riesgo promedio</dt>
+                <dd class="text-base font-bold" :style="`color: ${scoreColor(riskSummary?.average_risk_score, true)}`" x-text="formatScore(riskSummary?.average_risk_score)"></dd>
+              </div>
+              <div class="flex justify-between items-center py-2 border-b border-slate-100">
+                <dt class="text-sm text-slatey">Confianza promedio</dt>
+                <dd class="text-base font-bold" :style="`color: ${scoreColor(riskSummary?.average_trust_score)}`" x-text="formatScore(riskSummary?.average_trust_score)"></dd>
+              </div>
+              <div class="flex justify-between items-center py-2 border-b border-slate-100">
+                <dt class="text-sm text-slatey">Riesgo máximo</dt>
+                <dd class="text-base font-bold text-danger" x-text="formatScore(riskSummary?.highest_risk_score)"></dd>
+              </div>
+              <div class="flex justify-between items-center py-2">
+                <dt class="text-sm text-slatey">Riesgo mínimo</dt>
+                <dd class="text-base font-bold text-success" x-text="formatScore(riskSummary?.lowest_risk_score)"></dd>
+              </div>
+            </dl>
+          </div>
+        </div>
+
+        {# Trend chart #}
+        <div class="sd-chart-card">
+          <h2 class="text-sm font-bold text-navy mb-1">Tendencia de verificaciones y riesgo</h2>
+          <p class="text-xs text-slatey mb-4">Últimos 30 días</p>
+          <template x-if="loadingAnalytics">
+            <div class="sd-skeleton h-72 w-full rounded-lg"></div>
+          </template>
+          <template x-if="!loadingAnalytics && (!analytics?.risk_trend || analytics.risk_trend.length === 0)">
+            <div class="sd-empty-state">
+              <svg class="h-10 w-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+              <p class="text-sm">Sin datos suficientes para mostrar tendencia.</p>
+            </div>
+          </template>
+          <div x-show="!loadingAnalytics && analytics?.risk_trend?.length" class="sd-chart-canvas-wrap" style="height: 300px;">
+            <canvas id="risk-trend-chart"></canvas>
+          </div>
+        </div>
+      </section>
+
+      {# ══════ TAB: NEW VERIFICATION ══════ #}
+      <section x-show="activeTab === 'new'" class="sd-fade-in" id="new-verification">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {# Form #}
+          <div class="sd-card p-6">
+            <div class="flex items-center gap-3 mb-5">
+              <span class="h-10 w-10 rounded-xl bg-gradient-to-br from-brand to-accent text-white flex items-center justify-center">
+                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+              </span>
+              <div>
+                <h2 class="text-base font-bold text-navy">Nueva verificación de identidad</h2>
+                <p class="text-xs text-slatey">Complete los datos del individuo a verificar</p>
+              </div>
+            </div>
+
+            <form @submit.prevent="submitVerification()" class="space-y-4">
+              <div>
+                <label class="sd-label" for="new-name">Nombre completo</label>
+                <input id="new-name" type="text" x-model="verifyModal.form.name" class="sd-input" placeholder="JUAN GOMEZ RODRIGUEZ" />
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label class="sd-label" for="new-curp">CURP (18 caracteres)</label>
+                  <input id="new-curp" type="text" maxlength="18" x-model="verifyModal.form.curp"
+                         class="sd-input font-mono uppercase" placeholder="GOME850101HDFRRN09" />
+                </div>
+                <div>
+                  <label class="sd-label" for="new-rfc">RFC (12-13 caracteres)</label>
+                  <input id="new-rfc" type="text" maxlength="13" x-model="verifyModal.form.rfc"
+                         class="sd-input font-mono uppercase" placeholder="GOME850101ABC" />
+                </div>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label class="sd-label" for="new-birth">Fecha de nacimiento</label>
+                  <input id="new-birth" type="date" x-model="verifyModal.form.birth_date" class="sd-input" />
+                </div>
+                <div>
+                  <label class="sd-label" for="new-gender">Sexo</label>
+                  <select id="new-gender" x-model="verifyModal.form.gender" class="sd-input">
+                    <option value="">— Seleccionar —</option>
+                    <option value="H">Hombre</option>
+                    <option value="M">Mujer</option>
+                  </select>
+                </div>
+              </div>
+
+              <div x-show="verifyModal.error" x-cloak class="flex items-start gap-2 p-3 rounded-lg bg-danger-soft border border-danger/30">
+                <svg class="h-4 w-4 text-danger mt-0.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <p class="text-xs text-danger" x-text="verifyModal.error"></p>
+              </div>
+
+              <button type="submit" :disabled="verifyModal.loading" class="sd-btn sd-btn-primary w-full py-2.5">
+                <template x-if="verifyModal.loading"><span class="sd-spinner"></span></template>
+                <template x-if="!verifyModal.loading">
+                  <span class="flex items-center gap-2">
+                    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                    Verificar identidad
+                  </span>
+                </template>
+              </button>
+              <p class="text-xs text-slatey text-center">
+                Proporcione al menos CURP, RFC o nombre.
+              </p>
+            </form>
+          </div>
+
+          {# Result preview #}
+          <div class="sd-card p-6">
+            <h2 class="text-base font-bold text-navy mb-1">Resultado</h2>
+            <p class="text-xs text-slatey mb-5">El resultado de la verificación aparecerá aquí</p>
+
+            <template x-if="!verifyModal.result">
+              <div class="sd-empty-state">
+                <svg class="h-12 w-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <p class="text-sm">Sin verificación realizada.</p>
+                <p class="text-xs mt-1">Complete el formulario y haga clic en "Verificar identidad".</p>
+              </div>
+            </template>
+
+            <template x-if="verifyModal.result">
+              <div class="space-y-4 sd-fade-in">
+                {# Overall verdict #}
+                <div class="p-4 rounded-xl text-center"
+                     :class="verifyModal.result.overall_valid ? 'bg-success-soft' : 'bg-danger-soft'">
+                  <div class="h-14 w-14 rounded-full mx-auto flex items-center justify-center mb-2"
+                       :class="verifyModal.result.overall_valid ? 'bg-success text-white' : 'bg-danger text-white'">
+                    <template x-if="verifyModal.result.overall_valid">
+                      <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                    </template>
+                    <template x-if="!verifyModal.result.overall_valid">
+                      <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </template>
+                  </div>
+                  <p class="text-base font-bold" :class="verifyModal.result.overall_valid ? 'text-success' : 'text-danger'"
+                     x-text="verifyModal.result.overall_valid ? 'Identidad verificada' : 'Verificación fallida'"></p>
+                  <p class="text-xs text-slatey mt-1">ID de solicitud: <code class="font-mono text-navy" x-text="verifyModal.result.request_id?.substring(0, 8)"></code></p>
+                </div>
+
+                {# CURP result #}
+                <template x-if="verifyModal.result.curp_result">
+                  <div class="border border-slate-200 rounded-lg p-3">
+                    <div class="flex items-center justify-between mb-1">
+                      <p class="text-xs font-semibold uppercase tracking-wider text-slatey">CURP</p>
+                      <span class="sd-badge" :class="verifyModal.result.curp_result.is_valid ? 'sd-badge-success' : 'sd-badge-danger'"
+                            x-text="verifyModal.result.curp_result.is_valid ? 'VÁLIDA' : 'INVÁLIDA'"></span>
+                    </div>
+                    <template x-if="verifyModal.result.curp_result.errors && verifyModal.result.curp_result.errors.length">
+                      <ul class="text-xs text-danger mt-1 space-y-0.5">
+                        <template x-for="err in verifyModal.result.curp_result.errors" :key="err">
+                          <li>• <span x-text="err"></span></li>
+                        </template>
+                      </ul>
+                    </template>
+                    <template x-if="verifyModal.result.curp_result.extracted_info">
+                      <p class="text-xs text-slatey mt-1">
+                        Estado: <span class="font-semibold text-navy" x-text="verifyModal.result.curp_result.extracted_info.state_name"></span>
+                        · Sexo: <span class="font-semibold text-navy" x-text="verifyModal.result.curp_result.extracted_info.gender === 'H' ? 'Hombre' : 'Mujer'"></span>
+                      </p>
+                    </template>
+                  </div>
+                </template>
+
+                {# RFC result #}
+                <template x-if="verifyModal.result.rfc_result">
+                  <div class="border border-slate-200 rounded-lg p-3">
+                    <div class="flex items-center justify-between mb-1">
+                      <p class="text-xs font-semibold uppercase tracking-wider text-slatey">RFC</p>
+                      <span class="sd-badge" :class="verifyModal.result.rfc_result.is_valid ? 'sd-badge-success' : 'sd-badge-danger'"
+                            x-text="verifyModal.result.rfc_result.is_valid ? 'VÁLIDO' : 'INVÁLIDO'"></span>
+                    </div>
+                    <template x-if="verifyModal.result.rfc_result.errors && verifyModal.result.rfc_result.errors.length">
+                      <ul class="text-xs text-danger mt-1 space-y-0.5">
+                        <template x-for="err in verifyModal.result.rfc_result.errors" :key="err">
+                          <li>• <span x-text="err"></span></li>
+                        </template>
+                      </ul>
+                    </template>
+                    <template x-if="verifyModal.result.rfc_result.extracted_info">
+                      <p class="text-xs text-slatey mt-1">
+                        Tipo: <span class="font-semibold text-navy" x-text="verifyModal.result.rfc_result.extracted_info.person_type"></span>
+                      </p>
+                    </template>
+                  </div>
+                </template>
+
+                {# Consistency result #}
+                <template x-if="verifyModal.result.consistency_result">
+                  <div class="border border-slate-200 rounded-lg p-3">
+                    <div class="flex items-center justify-between">
+                      <p class="text-xs font-semibold uppercase tracking-wider text-slatey">Consistencia CURP-RFC</p>
+                      <span class="sd-badge" :class="verifyModal.result.consistency_result.is_consistent ? 'sd-badge-success' : 'sd-badge-warning'"
+                            x-text="verifyModal.result.consistency_result.is_consistent ? 'CONSISTENTE' : 'INCONSISTENTE'"></span>
+                    </div>
+                  </div>
+                </template>
+
+                {# Name similarity #}
+                <template x-if="verifyModal.result.name_similarity != null">
+                  <div class="border border-slate-200 rounded-lg p-3">
+                    <div class="flex items-center justify-between mb-2">
+                      <p class="text-xs font-semibold uppercase tracking-wider text-slatey">Similitud fonética del nombre</p>
+                      <span class="text-sm font-bold text-navy" x-text="(verifyModal.result.name_similarity * 100).toFixed(0) + '%'"></span>
+                    </div>
+                    <div class="sd-progress"><div class="sd-progress-bar" :style="`width: ${verifyModal.result.name_similarity * 100}%`"></div></div>
+                  </div>
+                </template>
+
+                <button @click="loadAll(); verifyModal.result = null" class="sd-btn sd-btn-ghost w-full">
+                  Realizar otra verificación
+                </button>
+              </div>
+            </template>
+          </div>
+        </div>
+      </section>
+
+      {# ══════ TAB: ACCOUNT ══════ #}
+      <section x-show="activeTab === 'account'" id="account" class="sd-fade-in"
+               x-data="profileEditor($data)">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+          {# Profile card #}
+          <div class="sd-card p-6 lg:col-span-1">
+            <div class="text-center">
+              <div class="h-20 w-20 rounded-full bg-gradient-to-br from-brand to-accent text-white text-2xl font-bold flex items-center justify-center mx-auto"
+                   x-text="user ? (user.full_name || 'U').substring(0,1).toUpperCase() : 'U'"></div>
+              <h2 class="mt-4 text-lg font-bold text-navy" x-text="user?.full_name"></h2>
+              <p class="text-sm text-slatey" x-text="user?.email"></p>
+              <span class="sd-badge sd-badge-info mt-2" x-text="user?.role"></span>
+            </div>
+
+            <dl class="mt-6 space-y-3 text-sm">
+              <div class="flex justify-between py-2 border-b border-slate-100">
+                <dt class="text-slatey">Empresa</dt>
+                <dd class="font-semibold text-navy" x-text="user?.company || '—'"></dd>
+              </div>
+              <div class="flex justify-between py-2 border-b border-slate-100">
+                <dt class="text-slatey">Teléfono</dt>
+                <dd class="font-semibold text-navy" x-text="user?.phone || '—'"></dd>
+              </div>
+              <div class="flex justify-between py-2 border-b border-slate-100">
+                <dt class="text-slatey">Cargo</dt>
+                <dd class="font-semibold text-navy" x-text="user?.position || '—'"></dd>
+              </div>
+              <div class="flex justify-between py-2 border-b border-slate-100">
+                <dt class="text-slatey">CURP</dt>
+                <dd class="font-semibold text-navy font-mono text-xs" x-text="user?.curp || '—'"></dd>
+              </div>
+              <div class="flex justify-between py-2 border-b border-slate-100">
+                <dt class="text-slatey">RFC</dt>
+                <dd class="font-semibold text-navy font-mono text-xs" x-text="user?.rfc || '—'"></dd>
+              </div>
+              <div class="flex justify-between py-2">
+                <dt class="text-slatey">Verificado</dt>
+                <dd><span class="sd-badge" :class="user?.is_verified ? 'sd-badge-success' : 'sd-badge-neutral'" x-text="user?.is_verified ? 'Sí' : 'No'"></span></dd>
+              </div>
+            </dl>
+          </div>
+
+          {# Edit profile + change password #}
+          <div class="lg:col-span-2 space-y-6">
+            <div class="sd-card p-6">
+              <div class="flex items-center justify-between mb-5">
+                <div>
+                  <h2 class="text-base font-bold text-navy">Datos del perfil</h2>
+                  <p class="text-xs text-slatey mt-0.5">Actualice su información personal</p>
+                </div>
+                <button @click="toggleEdit()" class="sd-btn sd-btn-ghost sd-btn-sm">
+                  <template x-if="!editing"><span class="flex items-center gap-1.5"><svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Editar</span></template>
+                  <template x-if="editing"><span>Cancelar</span></template>
+                </button>
+              </div>
+
+              <template x-if="!editing">
+                <dl class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                  <div><dt class="text-xs text-slatey uppercase tracking-wider">Nombre completo</dt><dd class="font-semibold text-navy mt-1" x-text="user?.full_name"></dd></div>
+                  <div><dt class="text-xs text-slatey uppercase tracking-wider">Email</dt><dd class="font-semibold text-navy mt-1" x-text="user?.email"></dd></div>
+                  <div><dt class="text-xs text-slatey uppercase tracking-wider">Empresa</dt><dd class="font-semibold text-navy mt-1" x-text="user?.company || '—'"></dd></div>
+                  <div><dt class="text-xs text-slatey uppercase tracking-wider">Teléfono</dt><dd class="font-semibold text-navy mt-1" x-text="user?.phone || '—'"></dd></div>
+                  <div><dt class="text-xs text-slatey uppercase tracking-wider">Cargo</dt><dd class="font-semibold text-navy mt-1" x-text="user?.position || '—'"></dd></div>
+                  <div><dt class="text-xs text-slatey uppercase tracking-wider">Último login</dt><dd class="font-semibold text-navy mt-1" x-text="user?.last_login ? formatDate(user.last_login) : 'Nunca'"></dd></div>
+                </dl>
+              </template>
+
+              <form x-show="editing" @submit.prevent="save()" class="space-y-4 sd-fade-in">
+                <div>
+                  <label class="sd-label">Nombre completo</label>
+                  <input type="text" x-model="form.full_name" class="sd-input" />
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label class="sd-label">Empresa</label>
+                    <input type="text" x-model="form.company" class="sd-input" />
+                  </div>
+                  <div>
+                    <label class="sd-label">Teléfono</label>
+                    <input type="tel" x-model="form.phone" class="sd-input" />
+                  </div>
+                </div>
+                <div>
+                  <label class="sd-label">Cargo</label>
+                  <input type="text" x-model="form.position" class="sd-input" />
+                </div>
+                <div class="flex justify-end gap-2 pt-3 border-t border-slate-200">
+                  <button type="button" @click="toggleEdit()" class="sd-btn sd-btn-ghost">Cancelar</button>
+                  <button type="submit" :disabled="saving" class="sd-btn sd-btn-primary">
+                    <template x-if="saving"><span class="sd-spinner"></span></template>
+                    <template x-if="!saving"><span>Guardar cambios</span></template>
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <div class="sd-card p-6">
+              <h2 class="text-base font-bold text-navy mb-1">Cambiar contraseña</h2>
+              <p class="text-xs text-slatey mb-5">Use al menos 8 caracteres, con letras y números</p>
+              <form @submit.prevent="savePassword()" class="space-y-4">
+                <div>
+                  <label class="sd-label">Contraseña actual</label>
+                  <input type="password" x-model="pwd.current" class="sd-input" required autocomplete="current-password" />
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label class="sd-label">Nueva contraseña</label>
+                    <input type="password" x-model="pwd.next" class="sd-input" required minlength="8" autocomplete="new-password" />
+                  </div>
+                  <div>
+                    <label class="sd-label">Confirmar contraseña</label>
+                    <input type="password" x-model="pwd.confirm" class="sd-input" required minlength="8" autocomplete="new-password" />
+                  </div>
+                </div>
+                <div class="flex justify-end">
+                  <button type="submit" :disabled="pwd.saving" class="sd-btn sd-btn-primary">
+                    <template x-if="pwd.saving"><span class="sd-spinner"></span></template>
+                    <template x-if="!pwd.saving"><span>Actualizar contraseña</span></template>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  {# ─── Verification modal (reuse for quick CTA) ─────────────────────── #}
+  <div x-show="verifyModal.open" x-cloak class="sd-modal-backdrop" @keydown.escape.window="closeVerifyModal()">
+    <div class="sd-modal max-w-2xl" @click.outside="closeVerifyModal()">
+      <div class="p-6 border-b border-slate-200 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <span class="h-10 w-10 rounded-xl bg-gradient-to-br from-brand to-accent text-white flex items-center justify-center">
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+          </span>
+          <div>
+            <h3 class="text-base font-bold text-navy">Verificación de identidad</h3>
+            <p class="text-xs text-slatey">Complete los campos a verificar</p>
+          </div>
+        </div>
+        <button @click="closeVerifyModal()" class="text-slatey hover:text-navy" aria-label="Cerrar">
+          <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div class="p-6 max-h-[70vh] overflow-y-auto">
+        <form @submit.prevent="submitVerification()" class="space-y-4">
+          <div>
+            <label class="sd-label">Nombre completo</label>
+            <input type="text" x-model="verifyModal.form.name" class="sd-input" placeholder="JUAN GOMEZ RODRIGUEZ" />
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="sd-label">CURP</label>
+              <input type="text" maxlength="18" x-model="verifyModal.form.curp" class="sd-input font-mono uppercase" placeholder="GOME850101HDFRRN09" />
+            </div>
+            <div>
+              <label class="sd-label">RFC</label>
+              <input type="text" maxlength="13" x-model="verifyModal.form.rfc" class="sd-input font-mono uppercase" placeholder="GOME850101ABC" />
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="sd-label">Fecha de nacimiento</label>
+              <input type="date" x-model="verifyModal.form.birth_date" class="sd-input" />
+            </div>
+            <div>
+              <label class="sd-label">Sexo</label>
+              <select x-model="verifyModal.form.gender" class="sd-input">
+                <option value="">—</option>
+                <option value="H">Hombre</option>
+                <option value="M">Mujer</option>
+              </select>
+            </div>
+          </div>
+
+          <div x-show="verifyModal.error" x-cloak class="flex items-start gap-2 p-3 rounded-lg bg-danger-soft border border-danger/30">
+            <svg class="h-4 w-4 text-danger mt-0.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <p class="text-xs text-danger" x-text="verifyModal.error"></p>
+          </div>
+
+          {# Result preview inside modal #}
+          <template x-if="verifyModal.result">
+            <div class="rounded-xl p-4 text-center sd-fade-in"
+                 :class="verifyModal.result.overall_valid ? 'bg-success-soft' : 'bg-danger-soft'">
+              <p class="text-base font-bold mb-1"
+                 :class="verifyModal.result.overall_valid ? 'text-success' : 'text-danger'"
+                 x-text="verifyModal.result.overall_valid ? '✓ Identidad verificada' : '✗ Verificación fallida'"></p>
+              <p class="text-xs text-slatey">
+                <template x-if="verifyModal.result.curp_result">
+                  <span>CURP: <span class="font-semibold" :class="verifyModal.result.curp_result.is_valid ? 'text-success' : 'text-danger'" x-text="verifyModal.result.curp_result.is_valid ? 'válida' : 'inválida'"></span> · </span>
+                </template>
+                <template x-if="verifyModal.result.rfc_result">
+                  <span>RFC: <span class="font-semibold" :class="verifyModal.result.rfc_result.is_valid ? 'text-success' : 'text-danger'" x-text="verifyModal.result.rfc_result.is_valid ? 'válido' : 'inválido'"></span></span>
+                </template>
+              </p>
+            </div>
+          </template>
+
+          <div class="flex justify-end gap-2 pt-3 border-t border-slate-200">
+            <button type="button" @click="closeVerifyModal()" class="sd-btn sd-btn-ghost">Cerrar</button>
+            <button type="submit" :disabled="verifyModal.loading" class="sd-btn sd-btn-primary">
+              <template x-if="verifyModal.loading"><span class="sd-spinner"></span></template>
+              <template x-if="!verifyModal.loading"><span>Verificar</span></template>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  {# ─── Verification detail modal ────────────────────────────────────── #}
+  <div x-show="detailModal.open" x-cloak class="sd-modal-backdrop" @keydown.escape.window="detailModal.open=false">
+    <div class="sd-modal max-w-2xl" @click.outside="detailModal.open=false">
+      <div class="p-6 border-b border-slate-200 flex items-center justify-between">
+        <h3 class="text-base font-bold text-navy">Detalle de verificación</h3>
+        <button @click="detailModal.open=false" class="text-slatey hover:text-navy" aria-label="Cerrar">
+          <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div class="p-6 space-y-5">
+        <template x-if="detailModal.loading">
+          <div class="space-y-3">
+            <div class="sd-skeleton h-20 w-full"></div>
+            <div class="sd-skeleton h-20 w-full"></div>
+            <div class="sd-skeleton h-20 w-full"></div>
+          </div>
+        </template>
+
+        <template x-if="!detailModal.loading && detailModal.detail">
+          <div class="space-y-5 sd-fade-in">
+            {# Header with entity name + recommendation #}
+            <div class="flex items-start justify-between gap-4 pb-4 border-b border-slate-100">
+              <div>
+                <p class="text-xs uppercase tracking-wider text-slatey font-semibold">Entidad verificada</p>
+                <p class="text-lg font-bold text-navy mt-1" x-text="detailModal.detail.entity_name"></p>
+                <p class="text-xs text-slatey mt-0.5">
+                  <span x-text="detailModal.detail.entity_type"></span>
+                  <template x-if="detailModal.detail.region"><span> · <span x-text="detailModal.detail.region"></span></span></template>
+                  <template x-if="detailModal.detail.industry"><span> · <span x-text="detailModal.detail.industry"></span></span></template>
+                </p>
+              </div>
+              <span class="sd-badge"
+                    :class="recommendationBadge(detailModal.detail.recommendation).cls"
+                    x-text="recommendationBadge(detailModal.detail.recommendation).label"></span>
+            </div>
+
+            {# Score gauges #}
+            <div class="grid grid-cols-2 gap-4">
+              <div class="text-center">
+                <div class="sd-gauge-wrap mx-auto">
+                  <canvas id="detail-trust-gauge" width="140" height="140"></canvas>
+                </div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-slatey mt-2">Confianza</p>
+              </div>
+              <div class="text-center">
+                <div class="sd-gauge-wrap mx-auto">
+                  <canvas id="detail-risk-gauge" width="140" height="140"></canvas>
+                </div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-slatey mt-2">Riesgo</p>
+              </div>
+            </div>
+
+            {# Details table #}
+            <dl class="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+              <div class="flex justify-between py-2 border-b border-slate-100"><dt class="text-slatey">CURP</dt><dd class="font-mono text-xs text-navy" x-text="detailModal.detail.curp || '—'"></dd></div>
+              <div class="flex justify-between py-2 border-b border-slate-100"><dt class="text-slatey">RFC</dt><dd class="font-mono text-xs text-navy" x-text="detailModal.detail.rfc || '—'"></dd></div>
+              <div class="flex justify-between py-2 border-b border-slate-100"><dt class="text-slatey">Tiempo de proceso</dt><dd class="text-navy" x-text="detailModal.detail.processing_time_ms ? detailModal.detail.processing_time_ms + ' ms' : '—'"></dd></div>
+              <div class="flex justify-between py-2 border-b border-slate-100"><dt class="text-slatey">Fecha</dt><dd class="text-navy" x-text="formatDate(detailModal.detail.created_at)"></dd></div>
+            </dl>
+
+            <button @click="if (detailModal.detail) window.location.href = '/dashboard/verification/' + detailModal.detail.id"
+                    class="sd-btn sd-btn-ghost w-full">
+              Ver reporte completo
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Charts are rendered by the clientDashboard() Alpine component itself:
+  //   - on initial load (loadAnalytics() calls _renderCharts())
+  //   - when entering the risk tab ($watch on activeTab)
+  // No additional glue code required. If Chart.js loads after Alpine
+  // initializes, we retry once on the next tick.
+  document.addEventListener('alpine:initialized', () => {
+    setTimeout(() => {
+      const root = document.querySelector('[x-data^="clientDashboard"]');
+      if (!root || !root._x_dataStack) return;
+      const cmp = root._x_dataStack[0];
+      if (cmp && typeof cmp._renderCharts === 'function') {
+        cmp._renderCharts();
+      }
+    }, 600);
+  });
+</script>
+{% endblock %}

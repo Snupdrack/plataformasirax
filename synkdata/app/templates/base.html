@@ -1,0 +1,164 @@
+{# =============================================================================
+   SynkData Identity Intelligence Platform — Base template
+   --------------------------------------------------------------------------
+   Provides:
+     - HTML5 doctype, meta tags, Open Graph defaults
+     - Tailwind CSS via CDN with custom theme (navy / blue / accent palette)
+     - Alpine.js via CDN (deferred)
+     - Inter font from Google Fonts
+     - Custom CSS block (overridable per-page)
+     - Blocks: title, head_extra, content, scripts
+     - Navbar and footer partials (overridable)
+   ========================================================================== #}
+<!DOCTYPE html>
+<html lang="es" class="h-full antialiased">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0A0E27" />
+  <meta name="description" content="SynkData — Inteligencia de Identidad para México y LATAM. Verificación KYC/AML, scoring de riesgo y cumplimiento normativo en una sola plataforma." />
+  <meta name="author" content="SynkData" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="SynkData" />
+  <meta property="og:title" content="{% block og_title %}SynkData — Inteligencia de Identidad{% endblock %}" />
+  <meta property="og:description" content="Verificación de identidad, antecedentes, KYC/AML y análisis de riesgo." />
+
+  <title>{% block title %}SynkData — Inteligencia de Identidad{% endblock %}</title>
+
+  <link rel="icon" type="image/svg+xml" href="/static/img/logo.svg" />
+
+  {# Inter font #}
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  {# Tailwind CSS via CDN #}
+  <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy: {
+              DEFAULT: '#0A0E27',
+              50:  '#EEF1FB',
+              100: '#D5DAF1',
+              200: '#A8B2DD',
+              300: '#7481C4',
+              400: '#4754A4',
+              500: '#27347C',
+              600: '#1B244F',
+              700: '#131A40',
+              800: '#0E1332',
+              900: '#070A1C',
+            },
+            brand: {
+              DEFAULT: '#2563EB',
+              50:  '#EFF6FF',
+              100: '#DBEAFE',
+              200: '#BFDBFE',
+              300: '#93C5FD',
+              400: '#60A5FA',
+              500: '#3B82F6',
+              600: '#2563EB',
+              700: '#1D4ED8',
+              800: '#1E40AF',
+              900: '#1E3A8A',
+            },
+            accent: {
+              DEFAULT: '#00D9FF',
+              50:  '#E6FBFF',
+              100: '#CCF7FF',
+              200: '#99EFFF',
+              300: '#66E4FF',
+              400: '#33DBFF',
+              500: '#00D9FF',
+              600: '#00A9CC',
+              700: '#0080A3',
+              800: '#005680',
+              900: '#003B59',
+            },
+            success: { DEFAULT: '#10B981', soft: '#D1FAE5' },
+            warning: { DEFAULT: '#F59E0B', soft: '#FEF3C7' },
+            danger:  { DEFAULT: '#EF4444', soft: '#FEE2E2' },
+            slatey:  '#64748B',
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+          },
+          boxShadow: {
+            'sd-sm': '0 1px 2px 0 rgba(10, 14, 39, 0.05)',
+            'sd':    '0 4px 12px -2px rgba(10, 14, 39, 0.08), 0 2px 6px -2px rgba(10, 14, 39, 0.05)',
+            'sd-md': '0 12px 32px -8px rgba(10, 14, 39, 0.14), 0 4px 12px -4px rgba(10, 14, 39, 0.08)',
+            'sd-lg': '0 24px 56px -12px rgba(10, 14, 39, 0.22)',
+          },
+          borderRadius: {
+            'sd':    '10px',
+            'sd-lg': '16px',
+            'sd-xl': '22px',
+          },
+          animation: {
+            'fade-in': 'sd-fade-in 0.3s cubic-bezier(0.4,0,0.2,1) both',
+            'fade-up': 'sd-fade-in-up 0.4s cubic-bezier(0.4,0,0.2,1) both',
+          },
+          keyframes: {
+            'sd-fade-in':     { from: { opacity: 0 }, to: { opacity: 1 } },
+            'sd-fade-in-up':  { from: { opacity: 0, transform: 'translateY(8px)' }, to: { opacity: 1, transform: 'translateY(0)' } },
+          }
+        }
+      }
+    };
+  </script>
+
+  {# Alpine.js via CDN (deferred so Alpine stores are ready before scripts) #}
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.5/dist/cdn.min.js"></script>
+
+  {# Chart.js (only loaded if a page declares it needs charts) #}
+  {% block chartjs %}
+  {% endblock %}
+
+  {# Shared stylesheet #}
+  <link rel="stylesheet" href="/static/css/custom.css" />
+
+  {# Per-page custom CSS / head additions #}
+  {% block head_extra %}{% endblock %}
+</head>
+
+<body class="min-h-full bg-slate-50 text-slate-900 font-sans" x-data="{ }">
+  <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:bg-white focus:text-navy focus:px-4 focus:py-2 focus:rounded-lg focus:shadow-sd-md">
+    Saltar al contenido principal
+  </a>
+
+  {# Navbar (overridable) #}
+  {% block navbar %}
+    {% include "partials/navbar.html" %}
+  {% endblock %}
+
+  {# Main content #}
+  <main id="main-content" class="{% block main_class %}{% endblock %}">
+    {% block content %}{% endblock %}
+  </main>
+
+  {# Footer (overridable) #}
+  {% block footer %}
+    {% include "partials/footer.html" %}
+  {% endblock %}
+
+  {# Shared app JavaScript #}
+  <script src="/static/js/app.js"></script>
+
+  {# Per-page scripts #}
+  {% block scripts %}{% endblock %}
+
+  {# Server-side context for client-side hydration (optional) #}
+  {% block hydration %}
+  <script>
+    window.__SYNKDATA__ = {
+      user: {{ user | tojson if user else 'null' }},
+      page: {{ page | tojson if page else '"unknown"' }},
+      csrf: {{ csrf_token | tojson if csrf_token else 'null' }}
+    };
+  </script>
+  {% endblock %}
+</body>
+</html>

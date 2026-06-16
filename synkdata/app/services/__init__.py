@@ -8,7 +8,7 @@ comparación difusa y fonética, los servicios de inteligencia
 digital (email, phone, username, social discovery), los
 servicios de inteligencia de identidad (correlación, trust score,
 motor de riesgo), el grafo de conocimiento, OCR, investigación
-con IA y analítica.
+con IA, analítica, autenticación de usuarios y lógica administrativa.
 """
 
 from app.services.curp_validator import CurpValidatorService
@@ -31,9 +31,12 @@ def __getattr__(name: str):
         "OcrService": "app.services.ocr_service",
         "AiInvestigationService": "app.services.ai_investigation",
         "AnalyticsService": "app.services.analytics_service",
+        "AuthService": "app.services.auth_service",
+        "AdminService": "app.services.admin_service",
     }
     if name in _lazy_imports:
         import importlib
+
         module = importlib.import_module(_lazy_imports[name])
         return getattr(module, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
@@ -57,4 +60,6 @@ __all__ = [
     "OcrService",
     "AiInvestigationService",
     "AnalyticsService",
+    "AuthService",
+    "AdminService",
 ]
