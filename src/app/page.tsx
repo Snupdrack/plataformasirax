@@ -1,6 +1,16 @@
 'use client'
 
-import React, { useState, useEffect, useCallback, createContext, useContext } from 'react'
+import React, { useState, useEffect, useRef, useCallback, createContext, useContext } from 'react'
+import {
+  motion,
+  useScroll,
+  useTransform,
+  useSpring,
+  useInView,
+  AnimatePresence,
+  useMotionValue,
+  animate,
+} from 'framer-motion'
 import {
   ShieldCheck, ArrowRight, IdCard, Scale, Globe2, Network,
   Brain, BarChart3, Plug, Lock, Eye, CheckCircle2, ChevronRight,
@@ -9,7 +19,7 @@ import {
   ChevronLeft, Activity, Database, ExternalLink, Copy, RefreshCw,
   Menu, X, LogOut, Plus, Filter, Download, Zap, Target,
   GitBranch, Linkedin, Github, Instagram, Twitter, MessageCircle,
-  BookOpen, Code2, Building2, Flag
+  BookOpen, Code2, Building2, Flag, Sparkles, Radar, Cpu, Layers,
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -20,11 +30,11 @@ import { useToast } from '@/hooks/use-toast'
 
 // ==================== API Helper ====================
 const API = {
-  get: async (path: string, token?: string) => {
+  get: async (path: string, token?: string | null) => {
     const res = await fetch(path, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
     return res.json()
   },
-  post: async (path: string, body: any, token?: string) => {
+  post: async (path: string, body: any, token?: string | null) => {
     const res = await fetch(path, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
@@ -32,7 +42,7 @@ const API = {
     })
     return res.json()
   },
-  del: async (path: string, token: string) => {
+  del: async (path: string, token: string | null) => {
     const res = await fetch(path, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
     return res.json()
   },
@@ -52,8 +62,8 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Read from localStorage on mount - this is the only safe place
-    const t = localStorage.getItem('synkdata_token')
-    const u = localStorage.getItem('synkdata_user')
+    const t = localStorage.getItem('sirax_token')
+    const u = localStorage.getItem('sirax_user')
     if (t) setToken(t)
     if (u) {
       try { setUser(JSON.parse(u)) } catch {}
@@ -63,15 +73,15 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const login = (t: string, u: User) => {
-    localStorage.setItem('synkdata_token', t)
-    localStorage.setItem('synkdata_user', JSON.stringify(u))
+    localStorage.setItem('sirax_token', t)
+    localStorage.setItem('sirax_user', JSON.stringify(u))
     setToken(t); setUser(u)
   }
 
   const logout = () => {
-    localStorage.removeItem('synkdata_token')
-    localStorage.removeItem('synkdata_user')
-    localStorage.removeItem('synkdata_view')
+    localStorage.removeItem('sirax_token')
+    localStorage.removeItem('sirax_user')
+    localStorage.removeItem('sirax_view')
     setToken(null); setUser(null)
   }
 
@@ -89,7 +99,9 @@ function useAuth() { return useContext(AuthContext) }
 function useToken(): string | null {
   const { token } = useAuth()
   if (token) return token
-  if (typeof window !== 'undefined') return localStorage.getItem('synkdata_token')
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('sirax_token') || localStorage.getItem('synkdata_token')
+  }
   return null
 }
 
@@ -103,30 +115,318 @@ const RouterContext = createContext<{ view: View; navigate: (v: View, data?: any
 function useRouter() { return useContext(RouterContext) }
 
 // ==================== Constants ====================
-const RISK_COLORS: Record<string, string> = { BAJO: '#10b981', MEDIO: '#f59e0b', ALTO: '#ef4444', CRITICO: '#9f1239' }
-const REC_COLORS: Record<string, string> = { APPROVE: '#10b981', REVIEW: '#f59e0b', REJECT: '#ef4444' }
+const RISK_COLORS: Record<string, string> = { BAJO: '#00d1a0', MEDIO: '#f59e0b', ALTO: '#ef4444', CRITICO: '#9f1239' }
+const REC_COLORS: Record<string, string> = { APPROVE: '#00d1a0', REVIEW: '#f59e0b', REJECT: '#ef4444' }
 const REC_LABEL: Record<string, string> = { APPROVE: 'Aprobar', REVIEW: 'Revisar', REJECT: 'Rechazar' }
 
-// ==================== Landing Module Card ====================
-function LandingModule({ icon: Icon, title, desc, items }: { icon: any; title: string; desc: string; items: string[] }) {
+// ==================== Sirax Logo ====================
+function SiraxMark({ size = 32, className = '' }: { size?: number; className?: string }) {
   return (
-    <div className="group p-6 bg-white border border-slate-200 rounded-lg hover:border-slate-950 transition-colors">
-      <div className="flex items-center justify-between mb-4">
-        <div className="h-10 w-10 bg-slate-950 text-white flex items-center justify-center rounded-md group-hover:scale-110 transition-transform">
-          <Icon className="h-5 w-5" strokeWidth={1.75} />
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 100 100"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+      aria-hidden="true"
+    >
+      {/* Connecting lines (dashed teal) */}
+      <g
+        stroke="#00D1A0"
+        strokeWidth="5"
+        strokeLinecap="round"
+        strokeDasharray="6 5"
+        opacity="0.9"
+      >
+        <line x1="50" y1="50" x2="18" y2="18" />
+        <line x1="50" y1="50" x2="82" y2="18" />
+        <line x1="50" y1="50" x2="18" y2="82" />
+        <line x1="50" y1="50" x2="82" y2="82" />
+      </g>
+      {/* Center node */}
+      <circle cx="50" cy="50" r="7" fill="currentColor" />
+      {/* Outer nodes */}
+      <circle cx="18" cy="18" r="5" fill="#00D1A0" />
+      <circle cx="82" cy="18" r="5" fill="#00D1A0" />
+      <circle cx="18" cy="82" r="5" fill="#00D1A0" />
+      <circle cx="82" cy="82" r="5" fill="#00D1A0" />
+    </svg>
+  )
+}
+
+function SiraxWordmark({
+  className = '',
+  showTagline = false,
+}: {
+  className?: string
+  showTagline?: boolean
+}) {
+  return (
+    <span className={`inline-flex flex-col leading-none ${className}`}>
+      <span className="sirax-wordmark text-current">
+        s
+        <span style={{ position: 'relative', display: 'inline-block' }}>
+          <span className="i-dot" />
+          <span style={{ opacity: 0 }}>i</span>
+          <span style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }} />
+        </span>
+        ra
+        <span className="x-teal">x</span>
+      </span>
+      {showTagline && (
+        <span className="text-[10px] uppercase tracking-[0.22em] text-current/60 mt-1.5 font-medium">
+          Identity & Risk Intelligence
+        </span>
+      )}
+    </span>
+  )
+}
+
+function SiraxLogo({
+  size = 32,
+  variant = 'light',
+  showTagline = false,
+  className = '',
+}: {
+  size?: number
+  variant?: 'light' | 'dark'
+  showTagline?: boolean
+  className?: string
+}) {
+  // variant 'light' = for navy backgrounds (white text)
+  // variant 'dark'  = for white backgrounds (navy text)
+  return (
+    <span className={`inline-flex items-center gap-2.5 ${className}`}>
+      <span className={variant === 'light' ? 'text-white' : 'text-sirax-navy'}>
+        <SiraxMark size={size} />
+      </span>
+      <span className={`flex flex-col leading-none ${variant === 'light' ? 'text-white' : 'text-sirax-navy'}`}>
+        <SiraxWordmark />
+        {showTagline && (
+          <span className="text-[9px] uppercase tracking-[0.24em] opacity-60 mt-1 font-medium">
+            a Synkdata product
+          </span>
+        )}
+      </span>
+    </span>
+  )
+}
+
+// ==================== Particle Field (Hero background) ====================
+function ParticleField() {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const mouseRef = useRef({ x: -9999, y: -9999 })
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    let raf = 0
+    let width = 0
+    let height = 0
+    let dpr = 1
+
+    type P = { x: number; y: number; vx: number; vy: number }
+    let particles: P[] = []
+
+    const resize = () => {
+      const parent = canvas.parentElement
+      if (!parent) return
+      const rect = parent.getBoundingClientRect()
+      dpr = Math.min(window.devicePixelRatio || 1, 2)
+      width = rect.width
+      height = rect.height
+      canvas.width = width * dpr
+      canvas.height = height * dpr
+      canvas.style.width = width + 'px'
+      canvas.style.height = height + 'px'
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      const count = Math.min(70, Math.floor((width * height) / 18000))
+      particles = Array.from({ length: count }, () => ({
+        x: Math.random() * width,
+        y: Math.random() * height,
+        vx: (Math.random() - 0.5) * 0.25,
+        vy: (Math.random() - 0.5) * 0.25,
+      }))
+    }
+
+    const draw = () => {
+      ctx.clearRect(0, 0, width, height)
+      const linkDist = 140
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i]
+        p.x += p.vx
+        p.y += p.vy
+        if (p.x < 0 || p.x > width) p.vx *= -1
+        if (p.y < 0 || p.y > height) p.vy *= -1
+
+        // mouse repulsion
+        const dxm = p.x - mouseRef.current.x
+        const dym = p.y - mouseRef.current.y
+        const dm = Math.hypot(dxm, dym)
+        if (dm < 120) {
+          p.x += (dxm / dm) * 0.6
+          p.y += (dym / dm) * 0.6
+        }
+
+        ctx.beginPath()
+        ctx.arc(p.x, p.y, 1.6, 0, Math.PI * 2)
+        ctx.fillStyle = 'rgba(0, 209, 160, 0.55)'
+        ctx.fill()
+      }
+      for (let i = 0; i < particles.length; i++) {
+        for (let j = i + 1; j < particles.length; j++) {
+          const a = particles[i]
+          const b = particles[j]
+          const dx = a.x - b.x
+          const dy = a.y - b.y
+          const d = Math.hypot(dx, dy)
+          if (d < linkDist) {
+            const op = (1 - d / linkDist) * 0.22
+            ctx.strokeStyle = `rgba(0, 209, 160, ${op})`
+            ctx.lineWidth = 1
+            ctx.beginPath()
+            ctx.moveTo(a.x, a.y)
+            ctx.lineTo(b.x, b.y)
+            ctx.stroke()
+          }
+        }
+      }
+      raf = requestAnimationFrame(draw)
+    }
+
+    resize()
+    draw()
+    window.addEventListener('resize', resize)
+
+    const onMove = (e: MouseEvent) => {
+      const rect = canvas.getBoundingClientRect()
+      mouseRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top }
+    }
+    const onLeave = () => {
+      mouseRef.current = { x: -9999, y: -9999 }
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseout', onLeave)
+
+    return () => {
+      cancelAnimationFrame(raf)
+      window.removeEventListener('resize', resize)
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseout', onLeave)
+    }
+  }, [])
+
+  return <canvas ref={canvasRef} className="absolute inset-0 pointer-events-none" />
+}
+
+// ==================== Scroll Reveal ====================
+function Reveal({
+  children,
+  delay = 0,
+  y = 24,
+  className = '',
+}: {
+  children: React.ReactNode
+  delay?: number
+  y?: number
+  className?: string
+}) {
+  const ref = useRef(null)
+  const inView = useInView(ref, { once: true, margin: '-80px' })
+  return (
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0, y }}
+      animate={inView ? { opacity: 1, y: 0 } : {}}
+      transition={{ duration: 0.7, delay, ease: [0.22, 1, 0.36, 1] }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  )
+}
+
+// ==================== Animated Counter ====================
+function Counter({
+  to,
+  suffix = '',
+  prefix = '',
+  decimals = 0,
+}: {
+  to: number
+  suffix?: string
+  prefix?: string
+  decimals?: number
+}) {
+  const ref = useRef<HTMLSpanElement>(null)
+  const inView = useInView(ref, { once: true, margin: '-40px' })
+  const [val, setVal] = useState(0)
+
+  useEffect(() => {
+    if (!inView) return
+    const controls = animate(0, to, {
+      duration: 1.6,
+      ease: [0.22, 1, 0.36, 1],
+      onUpdate: (v) => setVal(v),
+    })
+    return () => controls.stop()
+  }, [inView, to])
+
+  return (
+    <span ref={ref}>
+      {prefix}
+      {val.toFixed(decimals)}
+      {suffix}
+    </span>
+  )
+}
+
+// ==================== Landing Module Card ====================
+function LandingModule({
+  icon: Icon,
+  title,
+  desc,
+  items,
+  index,
+}: {
+  icon: any
+  title: string
+  desc: string
+  items: string[]
+  index: number
+}) {
+  return (
+    <Reveal delay={index * 0.05}>
+      <motion.div
+        whileHover={{ y: -4 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+        className="group relative h-full p-6 bg-white border border-slate-200 rounded-xl hover:border-sirax-teal transition-colors overflow-hidden"
+      >
+        <div className="absolute -top-12 -right-12 w-32 h-32 rounded-full bg-sirax-teal-soft opacity-0 group-hover:opacity-100 blur-2xl transition-opacity duration-500" />
+        <div className="relative">
+          <div className="flex items-center justify-between mb-4">
+            <div className="h-11 w-11 bg-sirax-navy text-white flex items-center justify-center rounded-lg group-hover:bg-sirax-teal group-hover:text-sirax-navy transition-colors">
+              <Icon className="h-5 w-5" strokeWidth={1.75} />
+            </div>
+            <ChevronRight className="h-4 w-4 text-slate-300 group-hover:text-sirax-teal group-hover:translate-x-1 transition-all" />
+          </div>
+          <h3 className="font-bold text-slate-950 text-lg mb-2">{title}</h3>
+          <p className="text-sm text-slate-500 mb-4 leading-relaxed">{desc}</p>
+          <ul className="space-y-1.5">
+            {items.map((it: string) => (
+              <li key={it} className="text-xs text-slate-600 font-mono flex items-center gap-1.5">
+                <span className="h-1 w-1 rounded-full bg-sirax-teal" />
+                {it}
+              </li>
+            ))}
+          </ul>
         </div>
-        <ChevronRight className="h-4 w-4 text-slate-300 group-hover:text-slate-950 group-hover:translate-x-1 transition-all" />
-      </div>
-      <h3 className="font-bold text-slate-950 text-lg mb-2">{title}</h3>
-      <p className="text-sm text-slate-500 mb-3 leading-relaxed">{desc}</p>
-      <ul className="space-y-1">
-        {items.map((it: string) => (
-          <li key={it} className="text-xs text-slate-600 font-mono flex items-center gap-1.5">
-            <CheckCircle2 className="h-3 w-3 text-emerald-600" strokeWidth={2.5} />{it}
-          </li>
-        ))}
-      </ul>
-    </div>
+      </motion.div>
+    </Reveal>
   )
 }
 
@@ -135,199 +435,554 @@ function LandingView() {
   const { navigate } = useRouter()
   const { user } = useAuth()
 
+  // Hero parallax
+  const heroRef = useRef<HTMLDivElement | null>(null)
+  const { scrollYProgress: heroProgress } = useScroll({
+    target: heroRef,
+    offset: ['start start', 'end start'],
+  })
+  const heroY = useTransform(heroProgress, [0, 1], [0, 140])
+  const heroOpacity = useTransform(heroProgress, [0, 0.8], [1, 0])
+  const heroScale = useTransform(heroProgress, [0, 1], [1, 0.96])
+
+  // Stats marquee — pause on hover handled via group-hover
+  const coverageSources = [
+    'RENAPO', 'SAT', 'IMSS', 'RND', 'OFAC', 'ONU',
+    'OpenSanctions', 'SAT 69-B', 'Interpol', 'EU Consolidated',
+    'UK HMT', 'HaveIBeenPwned', 'Hunter.io', 'NumVerify',
+    'Sherlock', 'Maigret', 'DOF', 'SCJN',
+  ]
+
   return (
     <div className="min-h-screen bg-white">
       {/* Nav */}
-      <header className="fixed top-0 inset-x-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200">
+      <motion.header
+        initial={{ y: -20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+        className="fixed top-0 inset-x-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200"
+      >
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <button onClick={() => navigate('landing')} className="flex items-center gap-2">
-            <div className="h-8 w-8 bg-slate-950 text-white flex items-center justify-center rounded-md">
-              <ShieldCheck className="h-5 w-5" strokeWidth={2} />
-            </div>
-            <span className="font-bold tracking-tight text-slate-950">SynkData</span>
-            <span className="hidden sm:inline text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-1">Identity Intelligence</span>
+          <button onClick={() => navigate('landing')} className="flex items-center">
+            <SiraxLogo size={30} variant="dark" showTagline />
           </button>
+          <nav className="hidden md:flex items-center gap-8 text-sm text-slate-600">
+            <a href="#modules" className="hover:text-sirax-navy transition-colors">Plataforma</a>
+            <a href="#coverage" className="hover:text-sirax-navy transition-colors">Cobertura</a>
+            <a href="#api" className="hover:text-sirax-navy transition-colors">API</a>
+            <button onClick={() => navigate('api-docs')} className="hover:text-sirax-navy transition-colors">Docs</button>
+          </nav>
           <div className="flex items-center gap-3">
             {user ? (
-              <button onClick={() => navigate('dashboard')} className="text-sm font-semibold bg-slate-950 text-white px-4 py-2 rounded-md hover:bg-slate-800 transition-colors">
+              <motion.button
+                whileHover={{ y: -1 }}
+                onClick={() => navigate('dashboard')}
+                className="text-sm font-semibold bg-sirax-navy text-white px-4 py-2 rounded-md hover:bg-sirax-navy-soft transition-colors"
+              >
                 Ir al Dashboard
-              </button>
+              </motion.button>
             ) : (
               <>
-                <button onClick={() => navigate('login')} className="text-sm font-medium text-slate-600 hover:text-slate-950">Iniciar sesión</button>
-                <button onClick={() => navigate('register')} className="text-sm font-semibold bg-slate-950 text-white px-4 py-2 rounded-md hover:bg-slate-800 transition-colors">
-                  Crear cuenta
+                <button onClick={() => navigate('login')} className="text-sm font-medium text-slate-600 hover:text-sirax-navy">
+                  Iniciar sesión
                 </button>
+                <motion.button
+                  whileHover={{ y: -1 }}
+                  onClick={() => navigate('register')}
+                  className="text-sm font-semibold bg-sirax-navy text-white px-4 py-2 rounded-md hover:bg-sirax-navy-soft transition-colors"
+                >
+                  Crear cuenta
+                </motion.button>
               </>
             )}
           </div>
         </div>
-      </header>
+      </motion.header>
 
       {/* Hero */}
-      <section className="relative bg-slate-950 text-white pt-32 pb-24 overflow-hidden">
-        <div className="absolute -top-32 -right-32 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl" />
-        <div className="relative max-w-7xl mx-auto px-6 grid lg:grid-cols-12 gap-12">
+      <section
+        ref={heroRef}
+        className="relative bg-sirax-navy text-white pt-32 pb-24 overflow-hidden"
+      >
+        {/* Background layers */}
+        <div className="absolute inset-0 sirax-grid opacity-60" />
+        <ParticleField />
+        <div className="absolute -top-40 -right-40 w-[28rem] h-[28rem] bg-sirax-teal/15 rounded-full blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-[28rem] h-[28rem] bg-sirax-teal/10 rounded-full blur-3xl" />
+
+        <motion.div
+          style={{ y: heroY, opacity: heroOpacity, scale: heroScale }}
+          className="relative max-w-7xl mx-auto px-6 grid lg:grid-cols-12 gap-12"
+        >
           <div className="lg:col-span-7">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-slate-700 bg-slate-900/50 text-xs font-medium text-slate-300 mb-6">
-              <span className="h-1.5 w-1.5 bg-emerald-500 rounded-full animate-pulse" />
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.1 }}
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-xs font-medium text-slate-300 mb-6 backdrop-blur"
+            >
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="absolute inset-0 rounded-full bg-sirax-teal animate-ping opacity-75" />
+                <span className="relative rounded-full bg-sirax-teal h-1.5 w-1.5" />
+              </span>
               Plataforma operativa · México y LATAM
-            </div>
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tighter leading-[1.05] mb-6">
-              Identity Intelligence.<br />
-              <span className="text-slate-400">Background Checks.</span><br />
-              Risk Intelligence.
+            </motion.div>
+
+            <h1 className="text-4xl sm:text-5xl lg:text-7xl font-extrabold tracking-tighter leading-[1.02] mb-6">
+              <motion.span
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.7, delay: 0.15 }}
+                className="block"
+              >
+                Know More.
+              </motion.span>
+              <motion.span
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.7, delay: 0.28 }}
+                className="block sirax-gradient-text"
+              >
+                Risk Less.
+              </motion.span>
             </h1>
-            <p className="text-base sm:text-lg text-slate-400 max-w-xl mb-8 leading-relaxed">
-              SynkData centraliza fuentes gubernamentales, listas regulatorias internacionales,
+
+            <motion.p
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.4 }}
+              className="text-base sm:text-lg text-slate-400 max-w-xl mb-8 leading-relaxed"
+            >
+              sirax centraliza fuentes gubernamentales, listas regulatorias internacionales,
               inteligencia digital y análisis relacional para entregar una visión completa de
               identidad y riesgo en segundos.
-            </p>
-            <div className="flex flex-wrap items-center gap-3">
-              <button onClick={() => navigate(user ? 'dashboard' : 'register')} className="inline-flex items-center gap-2 bg-white text-slate-950 px-5 py-3 rounded-md font-semibold text-sm hover:-translate-y-0.5 transition-transform">
+            </motion.p>
+
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.5 }}
+              className="flex flex-wrap items-center gap-3"
+            >
+              <motion.button
+                whileHover={{ y: -2 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => navigate(user ? 'dashboard' : 'register')}
+                className="inline-flex items-center gap-2 bg-sirax-teal text-sirax-navy px-5 py-3 rounded-md font-semibold text-sm hover:bg-sirax-teal-bright transition-colors"
+              >
                 Comenzar ahora <ArrowRight className="h-4 w-4" />
-              </button>
-              <button onClick={() => navigate('login')} className="inline-flex items-center gap-2 border border-slate-700 px-5 py-3 rounded-md font-semibold text-sm hover:bg-slate-900 transition-colors">
+              </motion.button>
+              <motion.button
+                whileHover={{ y: -2 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => navigate('login')}
+                className="inline-flex items-center gap-2 border border-white/15 px-5 py-3 rounded-md font-semibold text-sm hover:bg-white/5 transition-colors"
+              >
                 Acceder a la consola
-              </button>
-            </div>
-            <div className="mt-12 grid grid-cols-3 gap-6 max-w-md">
+              </motion.button>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.62 }}
+              className="mt-14 grid grid-cols-3 gap-6 max-w-md"
+            >
               {[
-                { v: '+15', l: 'Fuentes integradas' },
-                { v: '<2s', l: 'Tiempo de respuesta' },
-                { v: '99.9%', l: 'Disponibilidad' },
-              ].map(s => (
+                { v: 15, suffix: '+', l: 'Fuentes integradas' },
+                { v: 2, prefix: '<', suffix: 's', l: 'Tiempo de respuesta' },
+                { v: 99.9, suffix: '%', decimals: 1, l: 'Disponibilidad' },
+              ].map((s) => (
                 <div key={s.l}>
-                  <div className="text-2xl font-bold tracking-tight">{s.v}</div>
-                  <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500 mt-1">{s.l}</div>
+                  <div className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+                    <Counter to={s.v} prefix={s.prefix} suffix={s.suffix} decimals={s.decimals || 0} />
+                  </div>
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500 mt-1.5">
+                    {s.l}
+                  </div>
                 </div>
               ))}
-            </div>
+            </motion.div>
           </div>
+
+          {/* Hero card */}
           <div className="lg:col-span-5 relative">
-            <div className="relative rounded-lg border border-slate-800 bg-slate-900/50 backdrop-blur-sm p-5 shadow-2xl">
-              <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-3">Live demo · Trust Score</div>
-              <div className="flex items-end gap-6 mb-5">
-                <div className="text-7xl font-extrabold tracking-tighter">92</div>
-                <div>
-                  <div className="px-2 py-0.5 rounded text-xs font-bold bg-emerald-500 text-white">BAJO RIESGO</div>
-                  <div className="text-xs text-slate-400 mt-1">Recomendación: APROBAR</div>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.94, rotate: -2 }}
+              animate={{ opacity: 1, scale: 1, rotate: 0 }}
+              transition={{ duration: 0.9, delay: 0.4, ease: [0.22, 1, 0.36, 1] }}
+              className="relative rounded-2xl border border-white/10 bg-sirax-navy-soft/70 backdrop-blur-sm p-5 shadow-2xl"
+            >
+              {/* Glow */}
+              <div className="absolute -inset-1 sirax-glow-teal opacity-40 -z-10 rounded-2xl" />
+
+              <div className="flex items-center justify-between mb-4">
+                <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500">
+                  Live demo · Trust Score
+                </div>
+                <div className="flex items-center gap-1 text-[10px] text-sirax-teal font-mono">
+                  <span className="h-1.5 w-1.5 rounded-full bg-sirax-teal sirax-pulse-dot" />
+                  live
                 </div>
               </div>
+
+              <div className="flex items-end gap-6 mb-5">
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.7 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.8, delay: 0.7, type: 'spring' }}
+                  className="text-7xl font-extrabold tracking-tighter bg-gradient-to-br from-white to-sirax-teal bg-clip-text text-transparent"
+                >
+                  92
+                </motion.div>
+                <div>
+                  <div className="px-2 py-0.5 rounded text-xs font-bold bg-sirax-teal text-sirax-navy">
+                    BAJO RIESGO
+                  </div>
+                  <div className="text-xs text-slate-400 mt-1.5">Recomendación: APROBAR</div>
+                </div>
+              </div>
+
               <div className="space-y-2.5 text-xs">
                 {[
                   ['CURP', 'Verificado RENAPO'],
                   ['RFC', 'Activo en SAT'],
                   ['OFAC / ONU', 'Sin coincidencias'],
                   ['RND', 'Sin registros'],
-                  ['Email', 'Corporativo, 0 brechas'],
+                  ['Email', 'Corporativo · 0 brechas'],
                   ['LinkedIn', 'Perfil profesional'],
                   ['GitHub', 'Cuenta activa · 4 años'],
-                ].map(([k, v]) => (
-                  <div key={k} className="flex items-center justify-between p-2 rounded border border-slate-800 bg-slate-950/40">
+                ].map(([k, v], i) => (
+                  <motion.div
+                    key={k}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.5, delay: 0.8 + i * 0.08 }}
+                    className="flex items-center justify-between p-2 rounded-md border border-white/5 bg-white/[0.02]"
+                  >
                     <span className="text-slate-400">{k}</span>
                     <div className="flex items-center gap-1.5 text-slate-200 font-medium">
-                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" strokeWidth={2.5} />{v}
+                      <CheckCircle2 className="h-3.5 w-3.5 text-sirax-teal" strokeWidth={2.5} />
+                      {v}
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
-            </div>
+            </motion.div>
+
+            {/* Floating mini-badge */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 1 }}
+              className="absolute -left-4 -bottom-4 hidden md:flex items-center gap-2 px-3 py-2 rounded-lg bg-white text-sirax-navy shadow-xl border border-slate-100"
+            >
+              <div className="h-7 w-7 rounded-md bg-sirax-teal/15 flex items-center justify-center">
+                <Sparkles className="h-3.5 w-3.5 text-sirax-teal" />
+              </div>
+              <div className="text-[11px] font-semibold leading-tight">
+                AI Report<br />
+                <span className="text-slate-500 font-normal">generado en 1.4s</span>
+              </div>
+            </motion.div>
+          </div>
+        </motion.div>
+
+        {/* Scroll cue */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.4, duration: 0.8 }}
+          className="absolute bottom-6 left-1/2 -translate-x-1/2 text-slate-500 text-[10px] uppercase tracking-[0.3em] flex flex-col items-center gap-2"
+        >
+          <span>Scroll</span>
+          <motion.div
+            animate={{ y: [0, 6, 0] }}
+            transition={{ repeat: Infinity, duration: 1.6 }}
+            className="h-6 w-px bg-gradient-to-b from-sirax-teal to-transparent"
+          />
+        </motion.div>
+      </section>
+
+      {/* Trust marquee */}
+      <section className="bg-sirax-navy border-t border-white/5 py-6 overflow-hidden">
+        <div className="flex items-center gap-3 mb-3 px-6 max-w-7xl mx-auto">
+          <div className="text-[10px] uppercase tracking-[0.24em] text-slate-500">
+            Fuentes correlacionadas
+          </div>
+          <div className="flex-1 h-px bg-white/5" />
+        </div>
+        <div className="relative overflow-hidden sirax-no-scrollbar">
+          <div className="flex w-max sirax-marquee gap-4">
+            {[...coverageSources, ...coverageSources].map((s, i) => (
+              <div
+                key={i}
+                className="px-4 py-2 rounded-md border border-white/10 bg-white/[0.03] text-xs font-mono font-medium text-slate-400 whitespace-nowrap"
+              >
+                {s}
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
       {/* Modules */}
-      <section className="py-24 bg-slate-50">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="max-w-2xl mb-12">
-            <div className="text-xs font-bold uppercase tracking-[0.2em] text-blue-600 mb-3">Arquitectura</div>
-            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-950 mb-4">
-              Una sola plataforma. Diez módulos de inteligencia.
+      <section id="modules" className="py-24 bg-slate-50 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-sirax-teal/5 rounded-full blur-3xl" />
+        <div className="relative max-w-7xl mx-auto px-6">
+          <Reveal className="max-w-2xl mb-12">
+            <div className="text-xs font-bold uppercase tracking-[0.2em] text-sirax-teal mb-3 flex items-center gap-2">
+              <Layers className="h-3.5 w-3.5" />
+              Arquitectura
+            </div>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-sirax-navy mb-4">
+              Una sola plataforma.<br />
+              <span className="text-slate-400">Diez módulos de inteligencia.</span>
             </h2>
-          </div>
+            <p className="text-slate-500 max-w-xl">
+              Cada módulo opera de forma independiente o se correlaciona con los demás para
+              construir una vista 360° del sujeto, con scoring estandarizado y reporte AI en
+              español listo para auditoría.
+            </p>
+          </Reveal>
+
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            <LandingModule icon={IdCard} title="Identity Verification" desc="Validación de identidad oficial mexicana con algoritmo y registros."
+            <LandingModule index={0} icon={IdCard} title="Identity Verification"
+              desc="Validación de identidad oficial mexicana con algoritmo y registros."
               items={['CURP · dígito verificador', 'RFC PF · PM · Homoclave', 'RENAPO · SAT · IMSS']} />
-            <LandingModule icon={ShieldCheck} title="Government Intelligence" desc="Consulta de fuentes gubernamentales y registros oficiales."
+            <LandingModule index={1} icon={ShieldCheck} title="Government Intelligence"
+              desc="Consulta de fuentes gubernamentales y registros oficiales."
               items={['RENAPO · SAT · IMSS', 'RND (SSPC)', 'DOF · SCJN']} />
-            <LandingModule icon={Scale} title="Compliance Intelligence" desc="Screening contra listas restrictivas globales y locales."
+            <LandingModule index={2} icon={Scale} title="Compliance Intelligence"
+              desc="Screening contra listas restrictivas globales y locales."
               items={['OFAC · ONU · Interpol', 'OpenSanctions · EU · UK', 'SAT 69-B · PEP México']} />
-            <LandingModule icon={Globe2} title="Digital Identity Intelligence" desc="Verificación profunda de email, teléfono y aliases."
+            <LandingModule index={3} icon={Globe2} title="Digital Identity Intelligence"
+              desc="Verificación profunda de email, teléfono y aliases."
               items={['HIBP · Hunter · MX Records', 'Operador · spam · línea', 'Sherlock · Maigret']} />
-            <LandingModule icon={Eye} title="Digital Footprint" desc="Descubrimiento de presencia en plataformas sociales."
+            <LandingModule index={4} icon={Eye} title="Digital Footprint"
+              desc="Descubrimiento de presencia en plataformas sociales."
               items={['LinkedIn · GitHub · X', 'Instagram · Reddit · TikTok', 'Discord · Telegram · Medium']} />
-            <LandingModule icon={Network} title="Relationship Intelligence" desc="Knowledge graph con detección de patrones sospechosos."
+            <LandingModule index={5} icon={Network} title="Relationship Intelligence"
+              desc="Knowledge graph con detección de patrones sospechosos."
               items={['Entity Resolution', 'Visualización interactiva', 'Detección de redes ocultas']} />
-            <LandingModule icon={BarChart3} title="Risk Intelligence Engine" desc="Trust Score y Risk Score ponderados con recomendación."
+            <LandingModule index={6} icon={BarChart3} title="Risk Intelligence Engine"
+              desc="Trust Score y Risk Score ponderados con recomendación."
               items={['Trust 0-100 · Risk 0-100', 'Identity Confidence', 'APPROVE · REVIEW · REJECT']} />
-            <LandingModule icon={Brain} title="AI Investigation Engine" desc="Reportes automáticos en español con análisis multi-fuente."
+            <LandingModule index={7} icon={Brain} title="AI Investigation Engine"
+              desc="Reportes automáticos en español con análisis multi-fuente."
               items={['Resumen ejecutivo', 'Análisis multi-fuente', 'Recomendación final']} />
-            <LandingModule icon={Plug} title="API & Integrations" desc="REST API documentada para CRMs, ERPs, fintechs y bancos."
+            <LandingModule index={8} icon={Plug} title="API & Integrations"
+              desc="REST API documentada para CRMs, ERPs, fintechs y bancos."
               items={['POST /verify · /curp · /rfc', 'POST /screening · /identity', 'Webhooks · SDKs']} />
           </div>
         </div>
       </section>
 
       {/* Coverage */}
-      <section className="py-24 bg-white border-y border-slate-200">
+      <section id="coverage" className="py-24 bg-white border-y border-slate-200 relative">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="text-xs font-bold uppercase tracking-[0.2em] text-blue-600 mb-3">Cobertura</div>
-          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-950 mb-5">
-            Sin reemplazar tus integraciones. Las potencia.
-          </h2>
-          <p className="text-slate-500 mb-6 leading-relaxed max-w-2xl">
-            SynkData se diseñó como capa unificadora: consume tus integraciones existentes
-            y las correlaciona en una vista 360° del sujeto con scoring estandarizado y reporte AI.
-          </p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-2xl">
-            {['RENAPO', 'SAT', 'IMSS', 'RND', 'OFAC', 'ONU', 'OpenSanctions', 'SAT 69-B', 'HaveIBeenPwned', 'Hunter.io', 'NumVerify', 'Sherlock'].map(s => (
-              <div key={s} className="px-3 py-2 rounded-md border border-slate-200 bg-slate-50 text-xs font-mono font-medium text-slate-700">{s}</div>
-            ))}
+          <div className="grid lg:grid-cols-12 gap-12 items-center">
+            <Reveal className="lg:col-span-6" delay={0.05}>
+              <div className="text-xs font-bold uppercase tracking-[0.2em] text-sirax-teal mb-3 flex items-center gap-2">
+                <Radar className="h-3.5 w-3.5" />
+                Cobertura
+              </div>
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-sirax-navy mb-5 leading-tight">
+                Sin reemplazar tus integraciones.<br />
+                <span className="text-slate-400">Las potencia.</span>
+              </h2>
+              <p className="text-slate-500 mb-8 leading-relaxed max-w-xl">
+                sirax se diseñó como capa unificadora: consume tus integraciones existentes
+                y las correlaciona en una vista 360° del sujeto con scoring estandarizado y
+                reporte AI generado automáticamente.
+              </p>
+              <div className="flex items-center gap-6">
+                {[
+                  { v: 18, suffix: '+', l: 'Fuentes activas' },
+                  { v: 6, suffix: '', l: 'Países LATAM' },
+                  { v: 5, suffix: 'M+', l: 'Registros screened' },
+                ].map((s) => (
+                  <div key={s.l}>
+                    <div className="text-2xl font-bold text-sirax-navy">
+                      <Counter to={s.v} suffix={s.suffix} />
+                    </div>
+                    <div className="text-[10px] uppercase tracking-wider text-slate-400 mt-1">
+                      {s.l}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Reveal>
+
+            <Reveal className="lg:col-span-6" delay={0.15}>
+              <div className="grid grid-cols-3 gap-3">
+                {coverageSources.slice(0, 12).map((s, i) => (
+                  <motion.div
+                    key={s}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    whileInView={{ opacity: 1, scale: 1 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: i * 0.04, duration: 0.4 }}
+                    whileHover={{ y: -2, borderColor: 'var(--sirax-teal)' }}
+                    className="px-3 py-3 rounded-lg border border-slate-200 bg-slate-50 text-xs font-mono font-medium text-slate-700 text-center"
+                  >
+                    {s}
+                  </motion.div>
+                ))}
+              </div>
+            </Reveal>
           </div>
         </div>
       </section>
 
-      {/* API CTA */}
-      <section className="py-24 bg-slate-950 text-white relative overflow-hidden">
-        <div className="relative max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-12 items-center">
-          <div>
-            <Lock className="h-7 w-7 mb-4 text-blue-400" strokeWidth={1.75} />
-            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">Una API. Toda la inteligencia.</h2>
-            <p className="text-slate-400 mb-8 max-w-md">
-              Diseñada para CRMs, fintechs, ERPs, bancos, marketplaces y plataformas de RH.
-              Verifica identidad, evalúa riesgo y obtén un reporte AI en una sola llamada.
-            </p>
-            <button onClick={() => navigate('register')} className="inline-flex items-center gap-2 bg-white text-slate-950 px-5 py-3 rounded-md font-semibold text-sm hover:-translate-y-0.5 transition-transform">
-              Solicitar acceso <ArrowRight className="h-4 w-4" />
-            </button>
-          </div>
-          <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-5 font-mono text-xs leading-6 text-slate-300">
-            <div className="text-slate-500 mb-1"># Background check completo</div>
-            <div><span className="text-rose-400">POST</span> /api/checks</div>
-            <div className="text-slate-500 mt-3">{'{'}</div>
-            <div className="pl-3">
-              <span className="text-blue-400">{'"full_name"'}</span>: <span className="text-emerald-400">{'"Juan Pérez García"'}</span>,<br />
-              <span className="text-blue-400">{'"curp"'}</span>: <span className="text-emerald-400">{'"PEGJ800101HDFRRN09"'}</span>,<br />
-              <span className="text-blue-400">{'"rfc"'}</span>: <span className="text-emerald-400">{'"PEGJ800101AB1"'}</span>,<br />
-              <span className="text-blue-400">{'"email"'}</span>: <span className="text-emerald-400">{'"juan@empresa.mx"'}</span>,<br />
-              <span className="text-blue-400">{'"include_ai_report"'}</span>: <span className="text-amber-400">true</span>
+      {/* API CTA with parallax */}
+      <ApiCtaSection navigate={navigate} />
+
+      {/* Footer */}
+      <footer className="py-12 bg-sirax-navy text-white">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="grid md:grid-cols-12 gap-8 mb-8">
+            <div className="md:col-span-5">
+              <SiraxLogo size={32} variant="light" showTagline />
+              <p className="text-sm text-slate-400 mt-4 max-w-sm leading-relaxed">
+                Identity & Risk Intelligence Platform. Verificación de identidad,
+                background checks y risk intelligence para México y LATAM.
+              </p>
+              <div className="mt-4 text-xs text-sirax-teal font-semibold">
+                Know More. Risk Less.
+              </div>
             </div>
-            <div className="text-slate-500">{'}'}</div>
-            <div className="mt-3 pt-3 border-t border-slate-800 text-emerald-400">trust_score: 92 · risk_level: BAJO · recommendation: APPROVE</div>
+            <div className="md:col-span-2">
+              <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-3">Plataforma</div>
+              <ul className="space-y-2 text-sm text-slate-400">
+                <li><a href="#modules" className="hover:text-white transition-colors">Módulos</a></li>
+                <li><a href="#coverage" className="hover:text-white transition-colors">Cobertura</a></li>
+                <li><a href="#api" className="hover:text-white transition-colors">API</a></li>
+                <li><button onClick={() => navigate('api-docs')} className="hover:text-white transition-colors">Documentación</button></li>
+              </ul>
+            </div>
+            <div className="md:col-span-2">
+              <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-3">Herramientas</div>
+              <ul className="space-y-2 text-sm text-slate-400">
+                <li><button onClick={() => navigate('curp')} className="hover:text-white transition-colors">Validador CURP</button></li>
+                <li><button onClick={() => navigate('rfc')} className="hover:text-white transition-colors">Validador RFC</button></li>
+                <li><button onClick={() => navigate('sanctions')} className="hover:text-white transition-colors">Screening Sanciones</button></li>
+              </ul>
+            </div>
+            <div className="md:col-span-3">
+              <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-3">Synkdata</div>
+              <ul className="space-y-2 text-sm text-slate-400">
+                <li className="flex items-center gap-2"><Building2 className="h-3.5 w-3.5" /> Ciudad de México</li>
+                <li className="flex items-center gap-2"><Mail className="h-3.5 w-3.5" /> hello@synkdata.mx</li>
+              </ul>
+            </div>
           </div>
-        </div>
-      </section>
-
-      <footer className="py-8 bg-white border-t border-slate-200">
-        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row gap-3 items-center justify-between text-xs text-slate-500">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="h-4 w-4" strokeWidth={1.75} />
-            <span>© 2026 SynkData · Identity Intelligence Platform · México</span>
+          <div className="pt-6 border-t border-white/5 flex flex-col md:flex-row gap-3 items-center justify-between text-xs text-slate-500">
+            <div className="flex items-center gap-2">
+              <span>© 2026 sirax · a Synkdata product</span>
+            </div>
+            <div className="flex items-center gap-4">
+              <span>Términos</span>
+              <span>Privacidad</span>
+              <span>Seguridad</span>
+            </div>
           </div>
         </div>
       </footer>
     </div>
+  )
+}
+
+// ==================== API CTA Section (separate so it can use its own scroll hook) ====================
+function ApiCtaSection({ navigate }: { navigate: (v: View, data?: any) => void }) {
+  const ref = useRef<HTMLDivElement | null>(null)
+  const { scrollYProgress } = useScroll({
+    target: ref,
+    offset: ['start end', 'end start'],
+  })
+  const codeY = useTransform(scrollYProgress, [0, 1], [40, -40])
+  const glowOpacity = useTransform(scrollYProgress, [0, 0.5, 1], [0, 0.7, 0])
+
+  return (
+    <section id="api" ref={ref} className="py-24 bg-sirax-navy text-white relative overflow-hidden">
+      <motion.div
+        style={{ opacity: glowOpacity }}
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[40rem] h-[40rem] bg-sirax-teal/10 rounded-full blur-3xl pointer-events-none"
+      />
+      <div className="relative max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-12 items-center">
+        <Reveal>
+          <div className="h-12 w-12 rounded-xl bg-sirax-teal/15 flex items-center justify-center mb-5">
+            <Lock className="h-6 w-6 text-sirax-teal" strokeWidth={1.75} />
+          </div>
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight mb-5 leading-tight">
+            Una API.<br />
+            <span className="sirax-gradient-text">Toda la inteligencia.</span>
+          </h2>
+          <p className="text-slate-400 mb-8 max-w-md leading-relaxed">
+            Diseñada para CRMs, fintechs, ERPs, bancos, marketplaces y plataformas de RH.
+            Verifica identidad, evalúa riesgo y obtén un reporte AI en una sola llamada.
+          </p>
+          <div className="space-y-3 mb-8">
+            {[
+              ['POST', '/api/checks', 'Background check completo'],
+              ['POST', '/api/identity/curp', 'Validación con dígito verificador'],
+              ['POST', '/api/sanctions/screen', 'Screening fuzzy multi-lista'],
+            ].map(([m, p, d]) => (
+              <div key={p} className="flex items-center gap-3 text-xs font-mono">
+                <span className="px-1.5 py-0.5 rounded bg-sirax-teal/15 text-sirax-teal font-bold">{m}</span>
+                <span className="text-white">{p}</span>
+                <span className="text-slate-500">— {d}</span>
+              </div>
+            ))}
+          </div>
+          <motion.button
+            whileHover={{ y: -2 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => navigate('register')}
+            className="inline-flex items-center gap-2 bg-sirax-teal text-sirax-navy px-5 py-3 rounded-md font-semibold text-sm hover:bg-sirax-teal-bright transition-colors"
+          >
+            Solicitar acceso <ArrowRight className="h-4 w-4" />
+          </motion.button>
+        </Reveal>
+
+        <motion.div
+          style={{ y: codeY }}
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.8 }}
+          className="relative"
+        >
+          <div className="rounded-xl border border-white/10 bg-sirax-navy-soft/80 p-5 font-mono text-xs leading-6 text-slate-300 backdrop-blur shadow-2xl">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="h-2.5 w-2.5 rounded-full bg-rose-400/60" />
+              <div className="h-2.5 w-2.5 rounded-full bg-amber-400/60" />
+              <div className="h-2.5 w-2.5 rounded-full bg-sirax-teal/60" />
+              <div className="ml-2 text-[10px] text-slate-500">background_check.sh</div>
+            </div>
+            <div className="text-slate-500 mb-1"># Background check completo</div>
+            <div><span className="text-rose-400">POST</span> /api/checks</div>
+            <div className="text-slate-500 mt-3">{'{'}</div>
+            <div className="pl-3">
+              <span className="text-sky-400">{'"full_name"'}</span>: <span className="text-sirax-teal-bright">{'"Juan Pérez García"'}</span>,<br />
+              <span className="text-sky-400">{'"curp"'}</span>: <span className="text-sirax-teal-bright">{'"PEGJ800101HDFRRN09"'}</span>,<br />
+              <span className="text-sky-400">{'"rfc"'}</span>: <span className="text-sirax-teal-bright">{'"PEGJ800101AB1"'}</span>,<br />
+              <span className="text-sky-400">{'"email"'}</span>: <span className="text-sirax-teal-bright">{'"juan@empresa.mx"'}</span>,<br />
+              <span className="text-sky-400">{'"include_ai_report"'}</span>: <span className="text-amber-400">true</span>
+            </div>
+            <div className="text-slate-500">{'}'}</div>
+            <div className="mt-3 pt-3 border-t border-white/5">
+              <div className="text-sirax-teal">
+                trust_score: 92 · risk_level: BAJO · recommendation: APPROVE
+              </div>
+              <div className="text-slate-500 mt-1">
+                ai_report: ✓ generado en 1.4s · 8 fuentes correlacionadas
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    </section>
   )
 }
 
@@ -355,46 +1010,59 @@ function LoginView() {
 
   return (
     <div className="min-h-screen flex">
-      <div className="hidden lg:flex lg:w-1/2 bg-slate-950 text-white flex-col justify-center items-center p-12 relative overflow-hidden">
-        <div className="absolute -top-32 -right-32 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl" />
+      <div className="hidden lg:flex lg:w-1/2 bg-sirax-navy text-white flex-col justify-center items-center p-12 relative overflow-hidden">
+        <div className="absolute inset-0 sirax-grid opacity-50" />
+        <ParticleField />
+        <div className="absolute -top-32 -right-32 w-96 h-96 bg-sirax-teal/15 rounded-full blur-3xl" />
         <div className="relative">
-          <ShieldCheck className="h-16 w-16 mb-8" strokeWidth={1.5} />
-          <h1 className="text-4xl font-extrabold tracking-tight mb-4">SynkData</h1>
-          <p className="text-slate-400 max-w-sm leading-relaxed">Identity Intelligence Platform. Verificación de identidad, background checks y risk intelligence para México y LATAM.</p>
-          <div className="mt-8 p-4 rounded-lg border border-slate-800 bg-slate-900/50 text-xs font-mono">
+          <SiraxLogo size={56} variant="light" showTagline />
+          <div className="mt-8 max-w-sm">
+            <h1 className="text-3xl font-extrabold tracking-tight mb-3">
+              Know More.<br />
+              <span className="sirax-gradient-text">Risk Less.</span>
+            </h1>
+            <p className="text-slate-400 leading-relaxed">
+              Identity & Risk Intelligence Platform. Verificación de identidad,
+              background checks y risk intelligence para México y LATAM.
+            </p>
+          </div>
+          <div className="mt-8 p-4 rounded-lg border border-white/10 bg-white/[0.03] text-xs font-mono backdrop-blur">
             <div className="text-slate-500 mb-2">Demo credentials:</div>
-            <div>Admin: <span className="text-emerald-400">admin@synkdata.mx</span></div>
-            <div>Analyst: <span className="text-emerald-400">analyst@synkdata.mx</span></div>
+            <div>Admin: <span className="text-sirax-teal">admin@synkdata.mx</span></div>
+            <div>Analyst: <span className="text-sirax-teal">analyst@synkdata.mx</span></div>
           </div>
         </div>
       </div>
-      <div className="flex-1 flex items-center justify-center p-8">
+      <div className="flex-1 flex items-center justify-center p-8 bg-white">
         <div className="w-full max-w-md">
-          <button onClick={() => navigate('landing')} className="flex items-center gap-2 mb-8 text-slate-500 hover:text-slate-950 text-sm">
+          <button onClick={() => navigate('landing')} className="flex items-center gap-2 mb-8 text-slate-500 hover:text-sirax-navy text-sm">
             <ChevronLeft className="h-4 w-4" /> Volver al inicio
           </button>
-          <h2 className="text-3xl font-bold text-slate-950 mb-2">Iniciar sesión</h2>
+          <div className="mb-8 lg:hidden">
+            <SiraxLogo size={36} variant="dark" />
+          </div>
+          <h2 className="text-3xl font-bold text-sirax-navy mb-2">Iniciar sesión</h2>
           <p className="text-slate-500 mb-8">Accede a la consola de Identity Intelligence.</p>
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <label className="text-sm font-medium text-slate-700 mb-1 block">Email</label>
               <input type="email" value={email} onChange={e => setEmail(e.target.value)} required
-                className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-950"
+                className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal"
                 placeholder="tu@email.com" />
             </div>
             <div>
               <label className="text-sm font-medium text-slate-700 mb-1 block">Password</label>
               <input type="password" value={password} onChange={e => setPassword(e.target.value)} required
-                className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-950"
+                className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal"
                 placeholder="••••••••" />
             </div>
             <button type="submit" disabled={loading}
-              className="w-full bg-slate-950 text-white py-2.5 rounded-md font-semibold text-sm hover:bg-slate-800 transition-colors disabled:opacity-50">
+              className="w-full bg-sirax-navy text-white py-2.5 rounded-md font-semibold text-sm hover:bg-sirax-navy-soft transition-colors disabled:opacity-50">
               {loading ? 'Verificando...' : 'Iniciar sesión'}
             </button>
           </form>
           <p className="text-sm text-slate-500 mt-6 text-center">
-            ¿No tienes cuenta? <button onClick={() => navigate('register')} className="text-slate-950 font-semibold hover:underline">Crear cuenta</button>
+            ¿No tienes cuenta? <button onClick={() => navigate('register')} className="text-sirax-teal font-semibold hover:underline">Crear cuenta</button>
           </p>
         </div>
       </div>
@@ -425,49 +1093,64 @@ function RegisterView() {
 
   return (
     <div className="min-h-screen flex">
-      <div className="hidden lg:flex lg:w-1/2 bg-slate-950 text-white flex-col justify-center items-center p-12 relative overflow-hidden">
-        <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-emerald-600/20 rounded-full blur-3xl" />
+      <div className="hidden lg:flex lg:w-1/2 bg-sirax-navy text-white flex-col justify-center items-center p-12 relative overflow-hidden">
+        <div className="absolute inset-0 sirax-grid opacity-50" />
+        <ParticleField />
+        <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-sirax-teal/15 rounded-full blur-3xl" />
         <div className="relative">
-          <ShieldCheck className="h-16 w-16 mb-8" strokeWidth={1.5} />
-          <h1 className="text-4xl font-extrabold tracking-tight mb-4">Únete a SynkData</h1>
-          <p className="text-slate-400 max-w-sm leading-relaxed">Accede a la plataforma de Identity Intelligence más completa para México y Latinoamérica.</p>
+          <SiraxLogo size={56} variant="light" showTagline />
+          <div className="mt-8 max-w-sm">
+            <h1 className="text-3xl font-extrabold tracking-tight mb-3">
+              Únete a sirax.
+            </h1>
+            <p className="text-slate-400 leading-relaxed">
+              Accede a la plataforma de Identity & Risk Intelligence más completa
+              para México y Latinoamérica.
+            </p>
+            <div className="mt-6 text-sm text-sirax-teal font-semibold">
+              Know More. Risk Less.
+            </div>
+          </div>
         </div>
       </div>
-      <div className="flex-1 flex items-center justify-center p-8">
+      <div className="flex-1 flex items-center justify-center p-8 bg-white">
         <div className="w-full max-w-md">
-          <button onClick={() => navigate('landing')} className="flex items-center gap-2 mb-8 text-slate-500 hover:text-slate-950 text-sm">
+          <button onClick={() => navigate('landing')} className="flex items-center gap-2 mb-8 text-slate-500 hover:text-sirax-navy text-sm">
             <ChevronLeft className="h-4 w-4" /> Volver al inicio
           </button>
-          <h2 className="text-3xl font-bold text-slate-950 mb-2">Crear cuenta</h2>
+          <div className="mb-8 lg:hidden">
+            <SiraxLogo size={36} variant="dark" />
+          </div>
+          <h2 className="text-3xl font-bold text-sirax-navy mb-2">Crear cuenta</h2>
           <p className="text-slate-500 mb-8">Regístrate para acceder a la plataforma.</p>
           <form onSubmit={handleRegister} className="space-y-4">
             <div>
               <label className="text-sm font-medium text-slate-700 mb-1 block">Nombre completo</label>
               <input type="text" value={form.fullName} onChange={e => setForm(f => ({ ...f, fullName: e.target.value }))} required
-                className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-950" />
+                className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal" />
             </div>
             <div>
               <label className="text-sm font-medium text-slate-700 mb-1 block">Email</label>
               <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} required
-                className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-950" />
+                className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal" />
             </div>
             <div>
               <label className="text-sm font-medium text-slate-700 mb-1 block">Organización</label>
               <input type="text" value={form.organization} onChange={e => setForm(f => ({ ...f, organization: e.target.value }))}
-                className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-950" />
+                className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal" />
             </div>
             <div>
               <label className="text-sm font-medium text-slate-700 mb-1 block">Password</label>
               <input type="password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} required
-                className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-950" />
+                className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal" />
             </div>
             <button type="submit" disabled={loading}
-              className="w-full bg-slate-950 text-white py-2.5 rounded-md font-semibold text-sm hover:bg-slate-800 transition-colors disabled:opacity-50">
+              className="w-full bg-sirax-navy text-white py-2.5 rounded-md font-semibold text-sm hover:bg-sirax-navy-soft transition-colors disabled:opacity-50">
               {loading ? 'Creando cuenta...' : 'Crear cuenta'}
             </button>
           </form>
           <p className="text-sm text-slate-500 mt-6 text-center">
-            ¿Ya tienes cuenta? <button onClick={() => navigate('login')} className="text-slate-950 font-semibold hover:underline">Iniciar sesión</button>
+            ¿Ya tienes cuenta? <button onClick={() => navigate('login')} className="text-sirax-teal font-semibold hover:underline">Iniciar sesión</button>
           </p>
         </div>
       </div>
@@ -494,36 +1177,37 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen flex bg-slate-50">
       {/* Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-slate-200 transform transition-transform lg:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="h-16 flex items-center gap-2 px-6 border-b border-slate-200">
-          <div className="h-8 w-8 bg-slate-950 text-white flex items-center justify-center rounded-md">
-            <ShieldCheck className="h-5 w-5" strokeWidth={2} />
-          </div>
-          <span className="font-bold tracking-tight text-slate-950">SynkData</span>
+      <aside className={`fixed inset-y-0 left-0 z-40 w-64 bg-sirax-navy text-white transform transition-transform lg:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="h-16 flex items-center px-5 border-b border-white/5">
+          <SiraxLogo size={28} variant="light" />
         </div>
         <nav className="p-4 space-y-1">
-          {navItems.map(item => (
-            <button key={item.key} onClick={() => { navigate(item.key); setMobileOpen(false) }}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
-                view === item.key ? 'bg-slate-100 text-slate-950' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-950'
-              }`}>
-              <item.icon className="h-4 w-4" strokeWidth={1.75} />
-              {item.label}
-            </button>
-          ))}
+          {navItems.map(item => {
+            const active = view === item.key
+            return (
+              <button key={item.key} onClick={() => { navigate(item.key); setMobileOpen(false) }}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
+                  active ? 'bg-sirax-teal/15 text-sirax-teal' : 'text-slate-400 hover:bg-white/5 hover:text-white'
+                }`}>
+                <item.icon className="h-4 w-4" strokeWidth={1.75} />
+                {item.label}
+                {active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-sirax-teal" />}
+              </button>
+            )
+          })}
         </nav>
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-200">
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-white/5">
           <div className="flex items-center gap-3 mb-3">
-            <div className="h-8 w-8 bg-slate-200 rounded-full flex items-center justify-center">
-              <User className="h-4 w-4 text-slate-600" />
+            <div className="h-8 w-8 bg-sirax-teal/20 rounded-full flex items-center justify-center">
+              <User className="h-4 w-4 text-sirax-teal" />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium text-slate-950 truncate">{user?.full_name}</div>
-              <div className="text-[10px] uppercase tracking-wider text-slate-400">{user?.role}</div>
+              <div className="text-sm font-medium text-white truncate">{user?.full_name}</div>
+              <div className="text-[10px] uppercase tracking-wider text-slate-500">{user?.role}</div>
             </div>
           </div>
           <button onClick={() => { logout(); navigate('landing') }}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-950 transition-colors">
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm text-slate-400 hover:bg-white/5 hover:text-white transition-colors">
             <LogOut className="h-4 w-4" /> Cerrar sesión
           </button>
         </div>
@@ -535,8 +1219,22 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
           <button onClick={() => setMobileOpen(true)} className="lg:hidden">
             <Menu className="h-5 w-5 text-slate-600" />
           </button>
-          <div className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Identity Intelligence Platform</div>
-          <div />
+          <div className="flex items-center gap-3">
+            <div className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">
+              Identity & Risk Intelligence
+            </div>
+            <span className="hidden md:inline px-2 py-0.5 rounded text-[10px] font-semibold bg-sirax-teal/10 text-sirax-teal uppercase tracking-wider">
+              a Synkdata product
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate('new-check')}
+              className="hidden sm:inline-flex items-center gap-2 bg-sirax-navy text-white px-3 py-1.5 rounded-md text-xs font-semibold hover:bg-sirax-navy-soft transition-colors"
+            >
+              <Plus className="h-3.5 w-3.5" /> Nuevo Check
+            </button>
+          </div>
         </header>
         <main>{children}</main>
       </div>
@@ -551,10 +1249,10 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
 function StatCard({ icon: Icon, label, value, sub, accent }: { icon: any; label: string; value: any; sub?: string; accent?: string }) {
   return (
     <div className="p-5 bg-white border border-slate-200 rounded-lg">
-      <div className={`h-9 w-9 flex items-center justify-center rounded-md mb-3 ${accent || 'bg-slate-100 text-slate-950'}`}>
+      <div className={`h-9 w-9 flex items-center justify-center rounded-md mb-3 ${accent || 'bg-sirax-navy text-white'}`}>
         <Icon className="h-4 w-4" strokeWidth={1.75} />
       </div>
-      <div className="text-3xl font-extrabold tracking-tighter text-slate-950">{value}</div>
+      <div className="text-3xl font-extrabold tracking-tighter text-sirax-navy">{value}</div>
       <div className="text-xs uppercase tracking-wider text-slate-500 font-semibold mt-1">{label}</div>
       {sub && <div className="text-xs text-slate-400 mt-2">{sub}</div>}
     </div>
@@ -586,21 +1284,24 @@ function DashboardView() {
     <div className="p-6 lg:p-8 space-y-6">
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
         <div>
-          <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-600 mb-1.5">Dashboard ejecutivo</div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tighter text-slate-950">
+          <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-sirax-teal mb-1.5 flex items-center gap-2">
+            <Activity className="h-3.5 w-3.5" />
+            Dashboard ejecutivo
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tighter text-sirax-navy">
             Bienvenido, {user?.full_name?.split(' ')[0]}
           </h1>
           <p className="text-sm text-slate-500 mt-1">Identity Intelligence en tiempo real</p>
         </div>
         <button onClick={() => navigate('new-check')}
-          className="inline-flex items-center gap-2 bg-slate-950 text-white px-5 py-2.5 rounded-md font-semibold text-sm hover:-translate-y-0.5 transition-transform">
+          className="inline-flex items-center gap-2 bg-sirax-navy text-white px-5 py-2.5 rounded-md font-semibold text-sm hover:bg-sirax-navy-soft transition-colors">
           <FileSearch className="h-4 w-4" /> Nuevo Background Check <ArrowRight className="h-4 w-4" />
         </button>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        <StatCard icon={FileSearch} label="Checks procesados" value={data?.total_checks ?? 0} sub="Histórico total" accent="bg-slate-100 text-slate-950" />
-        <StatCard icon={CheckCircle2} label="Trust Score promedio" value={data?.average_trust_score ?? 0} sub="Promedio" accent="bg-emerald-100 text-emerald-700" />
+        <StatCard icon={FileSearch} label="Checks procesados" value={data?.total_checks ?? 0} sub="Histórico total" accent="bg-sirax-navy text-white" />
+        <StatCard icon={CheckCircle2} label="Trust Score promedio" value={data?.average_trust_score ?? 0} sub="Promedio" accent="bg-sirax-teal/15 text-sirax-teal" />
         <StatCard icon={ShieldAlert} label="Risk Score promedio" value={data?.average_risk_score ?? 0} sub="Promedio" accent="bg-amber-100 text-amber-700" />
         <StatCard icon={Scale} label="Coincidencias sanciones" value={data?.sanctions_matches ?? 0} sub={`PEP: ${data?.pep_matches ?? 0}`} accent="bg-rose-100 text-rose-700" />
       </div>
@@ -610,7 +1311,7 @@ function DashboardView() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Distribución</div>
-              <h3 className="font-bold text-slate-950">Niveles de riesgo</h3>
+              <h3 className="font-bold text-sirax-navy">Niveles de riesgo</h3>
             </div>
             <TrendingUp className="h-4 w-4 text-slate-400" />
           </div>
@@ -619,7 +1320,7 @@ function DashboardView() {
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
               <XAxis dataKey="level" stroke="#64748b" fontSize={11} />
               <YAxis stroke="#64748b" fontSize={11} allowDecimals={false} />
-              <Tooltip contentStyle={{ background: '#0f172a', border: 'none', borderRadius: 6, color: 'white', fontSize: 12 }} />
+              <Tooltip contentStyle={{ background: '#0a192f', border: 'none', borderRadius: 6, color: 'white', fontSize: 12 }} />
               <Bar dataKey="count" radius={[6, 6, 0, 0]}>
                 {riskData.map((entry, index) => <Cell key={index} fill={entry.fill} />)}
               </Bar>
@@ -630,14 +1331,14 @@ function DashboardView() {
         <div className="p-5 bg-white border border-slate-200 rounded-lg">
           <div className="mb-4">
             <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Recomendaciones</div>
-            <h3 className="font-bold text-slate-950">Veredicto</h3>
+            <h3 className="font-bold text-sirax-navy">Veredicto</h3>
           </div>
           <ResponsiveContainer width="100%" height={240}>
             <PieChart>
               <Pie data={recData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={45} outerRadius={75} paddingAngle={2}>
                 {recData.map((entry, index) => <Cell key={index} fill={entry.fill} />)}
               </Pie>
-              <Tooltip contentStyle={{ background: '#0f172a', border: 'none', borderRadius: 6, color: 'white', fontSize: 12 }} />
+              <Tooltip contentStyle={{ background: '#0a192f', border: 'none', borderRadius: 6, color: 'white', fontSize: 12 }} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
             </PieChart>
           </ResponsiveContainer>
@@ -648,34 +1349,34 @@ function DashboardView() {
         <div className="lg:col-span-2 p-5 bg-white border border-slate-200 rounded-lg">
           <div className="mb-4">
             <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Tendencia</div>
-            <h3 className="font-bold text-slate-950">Checks últimos 14 días</h3>
+            <h3 className="font-bold text-sirax-navy">Checks últimos 14 días</h3>
           </div>
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={data?.trend_14_days || []}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
               <XAxis dataKey="date" stroke="#64748b" fontSize={10} />
               <YAxis stroke="#64748b" fontSize={11} allowDecimals={false} />
-              <Tooltip contentStyle={{ background: '#0f172a', border: 'none', borderRadius: 6, color: 'white', fontSize: 12 }} />
-              <Line type="monotone" dataKey="count" stroke="#0f172a" strokeWidth={2} dot={{ fill: '#0f172a', r: 3 }} />
+              <Tooltip contentStyle={{ background: '#0a192f', border: 'none', borderRadius: 6, color: 'white', fontSize: 12 }} />
+              <Line type="monotone" dataKey="count" stroke="#00d1a0" strokeWidth={2} dot={{ fill: '#00d1a0', r: 3 }} />
             </LineChart>
           </ResponsiveContainer>
         </div>
 
         <div className="p-5 bg-white border border-slate-200 rounded-lg">
-          <h3 className="font-bold text-slate-950 mb-1">Checks recientes</h3>
+          <h3 className="font-bold text-sirax-navy mb-1">Checks recientes</h3>
           <div className="text-[10px] uppercase tracking-wider text-slate-400 mb-3">Últimas verificaciones</div>
           <div className="space-y-2 max-h-[260px] overflow-y-auto">
             {(data?.recent_checks || []).map((c: any) => (
               <button key={c.id} onClick={() => navigate('check-results', { checkId: c.id })}
                 className="flex items-center gap-3 p-2.5 w-full text-left rounded-md hover:bg-slate-50 transition-colors">
-                <div className={`w-1 h-9 rounded-full ${c.risk_level === 'BAJO' ? 'bg-emerald-500' : c.risk_level === 'MEDIO' ? 'bg-amber-500' : c.risk_level === 'ALTO' ? 'bg-rose-500' : 'bg-rose-700'}`} />
+                <div className={`w-1 h-9 rounded-full ${c.risk_level === 'BAJO' ? 'bg-sirax-teal' : c.risk_level === 'MEDIO' ? 'bg-amber-500' : c.risk_level === 'ALTO' ? 'bg-rose-500' : 'bg-rose-700'}`} />
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-slate-950 truncate">{c.subject?.full_name}</div>
+                  <div className="text-sm font-medium text-sirax-navy truncate">{c.subject?.full_name}</div>
                   <div className="text-[10px] text-slate-500 font-mono">{(c.created_at || '').slice(0, 16).replace('T', ' ')}</div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="text-xs font-bold text-slate-950">{c.trust_score}</div>
-                  {c.recommendation === 'APPROVE' ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> :
+                  <div className="text-xs font-bold text-sirax-navy">{c.trust_score}</div>
+                  {c.recommendation === 'APPROVE' ? <CheckCircle2 className="h-4 w-4 text-sirax-teal" /> :
                    c.recommendation === 'REVIEW' ? <Eye className="h-4 w-4 text-amber-500" /> :
                    <XCircle className="h-4 w-4 text-rose-500" />}
                 </div>
@@ -726,8 +1427,8 @@ function NewCheckView() {
   return (
     <div className="p-6 lg:p-8 max-w-4xl mx-auto">
       <div className="mb-8">
-        <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-600 mb-1.5">Background Check</div>
-        <h1 className="text-3xl font-extrabold tracking-tighter text-slate-950">Nueva verificación</h1>
+        <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-sirax-teal mb-1.5">Background Check</div>
+        <h1 className="text-3xl font-extrabold tracking-tighter text-sirax-navy">Nueva verificación</h1>
         <p className="text-sm text-slate-500 mt-1">Completa los datos del sujeto para el análisis de identidad.</p>
       </div>
 
@@ -737,7 +1438,7 @@ function NewCheckView() {
           <React.Fragment key={s}>
             <button onClick={() => i < step && setStep(i)}
               className={`flex items-center gap-2 px-3 py-2 rounded-md text-xs font-semibold transition-colors ${
-                i === step ? 'bg-slate-950 text-white' : i < step ? 'bg-emerald-100 text-emerald-700 cursor-pointer' : 'bg-slate-100 text-slate-400'
+                i === step ? 'bg-sirax-navy text-white' : i < step ? 'bg-sirax-teal/15 text-sirax-teal cursor-pointer' : 'bg-slate-100 text-slate-400'
               }`}>
               {React.createElement(stepIcons[i], { className: 'h-3.5 w-3.5' })}
               {s}
@@ -750,17 +1451,17 @@ function NewCheckView() {
       {/* Step 0: Personal */}
       {step === 0 && (
         <div className="space-y-4 bg-white p-6 rounded-lg border border-slate-200">
-          <h2 className="font-bold text-slate-950 text-lg mb-4">Datos personales</h2>
+          <h2 className="font-bold text-sirax-navy text-lg mb-4">Datos personales</h2>
           <div>
             <label className="text-sm font-medium text-slate-700 mb-1 block">Nombre completo *</label>
             <input value={form.full_name} onChange={e => setForm(f => ({ ...f, full_name: e.target.value }))}
-              className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-950"
+              className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal"
               placeholder="Juan Pérez García" />
           </div>
           <div>
             <label className="text-sm font-medium text-slate-700 mb-1 block">Dirección</label>
             <input value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))}
-              className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-950"
+              className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal"
               placeholder="Ciudad de México, CDMX" />
           </div>
         </div>
@@ -769,18 +1470,18 @@ function NewCheckView() {
       {/* Step 1: Identity */}
       {step === 1 && (
         <div className="space-y-4 bg-white p-6 rounded-lg border border-slate-200">
-          <h2 className="font-bold text-slate-950 text-lg mb-4">Datos de identidad</h2>
+          <h2 className="font-bold text-sirax-navy text-lg mb-4">Datos de identidad</h2>
           <div>
             <label className="text-sm font-medium text-slate-700 mb-1 block">CURP</label>
             <input value={form.curp} onChange={e => setForm(f => ({ ...f, curp: e.target.value.toUpperCase() }))} maxLength={18}
-              className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-950"
+              className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal"
               placeholder="PEGJ800101HDFRRN09" />
             <p className="text-[10px] text-slate-400 mt-1">18 caracteres · Algoritmo de verificación oficial</p>
           </div>
           <div>
             <label className="text-sm font-medium text-slate-700 mb-1 block">RFC</label>
             <input value={form.rfc} onChange={e => setForm(f => ({ ...f, rfc: e.target.value.toUpperCase() }))} maxLength={13}
-              className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-950"
+              className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal"
               placeholder="PEGJ800101AB1" />
             <p className="text-[10px] text-slate-400 mt-1">12 (moral) o 13 (física) caracteres</p>
           </div>
@@ -790,23 +1491,23 @@ function NewCheckView() {
       {/* Step 2: Digital */}
       {step === 2 && (
         <div className="space-y-4 bg-white p-6 rounded-lg border border-slate-200">
-          <h2 className="font-bold text-slate-950 text-lg mb-4">Identidad digital</h2>
+          <h2 className="font-bold text-sirax-navy text-lg mb-4">Identidad digital</h2>
           <div>
             <label className="text-sm font-medium text-slate-700 mb-1 block">Email</label>
             <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-              className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-950"
+              className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal"
               placeholder="juan@empresa.mx" />
           </div>
           <div>
             <label className="text-sm font-medium text-slate-700 mb-1 block">Teléfono</label>
             <input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-              className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-950"
+              className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal"
               placeholder="+52 55 1234 5678" />
           </div>
           <div>
             <label className="text-sm font-medium text-slate-700 mb-1 block">Username / Alias</label>
             <input value={form.username} onChange={e => setForm(f => ({ ...f, username: e.target.value }))}
-              className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-950"
+              className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal"
               placeholder="snupdrack" />
           </div>
         </div>
@@ -815,7 +1516,7 @@ function NewCheckView() {
       {/* Step 3: Modules */}
       {step === 3 && (
         <div className="space-y-4 bg-white p-6 rounded-lg border border-slate-200">
-          <h2 className="font-bold text-slate-950 text-lg mb-4">Módulos de análisis</h2>
+          <h2 className="font-bold text-sirax-navy text-lg mb-4">Módulos de análisis</h2>
           <p className="text-sm text-slate-500 mb-4">Selecciona qué módulos incluir en la verificación.</p>
           {[
             { key: 'include_government', label: 'Government Intelligence', desc: 'RENAPO, SAT, IMSS, RND', icon: ShieldCheck },
@@ -825,14 +1526,14 @@ function NewCheckView() {
             { key: 'include_ai_report', label: 'AI Investigation Report', desc: 'Reporte automático de investigación', icon: Brain },
           ].map(m => (
             <label key={m.key} className={`flex items-center gap-4 p-4 rounded-md border cursor-pointer transition-colors ${
-              (form as any)[m.key] ? 'border-slate-950 bg-slate-50' : 'border-slate-200'
+              (form as any)[m.key] ? 'border-sirax-teal bg-sirax-teal/5' : 'border-slate-200'
             }`}>
               <input type="checkbox" checked={(form as any)[m.key]}
                 onChange={e => setForm(f => ({ ...f, [m.key]: e.target.checked }))}
-                className="h-4 w-4 rounded border-slate-300" />
+                className="h-4 w-4 rounded border-slate-300 accent-[#00d1a0]" />
               <m.icon className="h-5 w-5 text-slate-600" strokeWidth={1.75} />
               <div>
-                <div className="text-sm font-semibold text-slate-950">{m.label}</div>
+                <div className="text-sm font-semibold text-sirax-navy">{m.label}</div>
                 <div className="text-xs text-slate-500">{m.desc}</div>
               </div>
             </label>
@@ -843,17 +1544,17 @@ function NewCheckView() {
       {/* Navigation buttons */}
       <div className="flex items-center justify-between mt-6">
         <button onClick={() => step > 0 ? setStep(step - 1) : navigate('dashboard')}
-          className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-950">
+          className="flex items-center gap-2 text-sm text-slate-600 hover:text-sirax-navy">
           <ChevronLeft className="h-4 w-4" /> {step > 0 ? 'Anterior' : 'Cancelar'}
         </button>
         {step < 3 ? (
           <button onClick={() => setStep(step + 1)} disabled={!form.full_name.trim()}
-            className="flex items-center gap-2 bg-slate-950 text-white px-5 py-2.5 rounded-md font-semibold text-sm hover:bg-slate-800 disabled:opacity-50">
+            className="flex items-center gap-2 bg-sirax-navy text-white px-5 py-2.5 rounded-md font-semibold text-sm hover:bg-sirax-navy-soft disabled:opacity-50">
             Siguiente <ChevronRight className="h-4 w-4" />
           </button>
         ) : (
           <button onClick={handleSubmit} disabled={loading}
-            className="flex items-center gap-2 bg-slate-950 text-white px-5 py-2.5 rounded-md font-semibold text-sm hover:bg-slate-800 disabled:opacity-50">
+            className="flex items-center gap-2 bg-sirax-teal text-sirax-navy px-5 py-2.5 rounded-md font-semibold text-sm hover:bg-sirax-teal-bright disabled:opacity-50">
             {loading ? (
               <><RefreshCw className="h-4 w-4 animate-spin" /> Procesando...</>
             ) : (
@@ -906,10 +1607,10 @@ function CheckResultsView() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
         <div>
-          <button onClick={() => navigate('history')} className="text-sm text-slate-500 hover:text-slate-950 flex items-center gap-1 mb-2">
+          <button onClick={() => navigate('history')} className="text-sm text-slate-500 hover:text-sirax-navy flex items-center gap-1 mb-2">
             <ChevronLeft className="h-4 w-4" /> Historial
           </button>
-          <h1 className="text-3xl font-extrabold tracking-tighter text-slate-950">{check.subject?.full_name}</h1>
+          <h1 className="text-3xl font-extrabold tracking-tighter text-sirax-navy">{check.subject?.full_name}</h1>
           <div className="flex items-center gap-3 mt-2">
             <div className="px-2 py-0.5 rounded text-xs font-bold text-white" style={{ backgroundColor: riskColor }}>{check.risk_level}</div>
             <div className="text-sm text-slate-500">Recomendación: {check.recommendation}</div>
@@ -920,7 +1621,7 @@ function CheckResultsView() {
 
       {/* Scores */}
       <div className="grid grid-cols-3 gap-4 bg-white p-6 rounded-lg border border-slate-200">
-        <ScoreGauge value={check.trust_score} label="Trust Score" color="#10b981" />
+        <ScoreGauge value={check.trust_score} label="Trust Score" color="#00d1a0" />
         <ScoreGauge value={check.risk_score} label="Risk Score" color={riskColor} />
         <ScoreGauge value={check.identity_confidence} label="Confianza" color="#6366f1" />
       </div>
@@ -942,19 +1643,19 @@ function CheckResultsView() {
           <div className="p-5 bg-white border border-slate-200 rounded-lg">
             <div className="flex items-center gap-2 mb-3">
               <IdCard className="h-4 w-4 text-slate-600" strokeWidth={1.75} />
-              <h3 className="font-bold text-slate-950">CURP</h3>
+              <h3 className="font-bold text-sirax-navy">CURP</h3>
               {check.curp_validation.is_valid ?
-                <CheckCircle2 className="h-4 w-4 text-emerald-500" /> :
+                <CheckCircle2 className="h-4 w-4 text-sirax-teal" /> :
                 <XCircle className="h-4 w-4 text-rose-500" />}
             </div>
             <div className="text-sm font-mono bg-slate-50 p-3 rounded mb-3">{check.curp_validation.curp}</div>
             <div className="text-sm text-slate-600">{check.curp_validation.message}</div>
             {check.curp_validation.components && (
               <div className="mt-3 space-y-1 text-xs">
-                <div className="flex justify-between"><span className="text-slate-400">Fecha nacimiento</span><span className="text-slate-950 font-medium">{check.curp_validation.components.birth_date}</span></div>
-                <div className="flex justify-between"><span className="text-slate-400">Sexo</span><span className="text-slate-950 font-medium">{check.curp_validation.components.sex}</span></div>
-                <div className="flex justify-between"><span className="text-slate-400">Estado</span><span className="text-slate-950 font-medium">{check.curp_validation.components.state}</span></div>
-                <div className="flex justify-between"><span className="text-slate-400">Dígito verificador</span><span className="text-slate-950 font-medium">{check.curp_validation.check_digit_valid ? '✓ Válido' : '✗ Inválido'}</span></div>
+                <div className="flex justify-between"><span className="text-slate-400">Fecha nacimiento</span><span className="text-sirax-navy font-medium">{check.curp_validation.components.birth_date}</span></div>
+                <div className="flex justify-between"><span className="text-slate-400">Sexo</span><span className="text-sirax-navy font-medium">{check.curp_validation.components.sex}</span></div>
+                <div className="flex justify-between"><span className="text-slate-400">Estado</span><span className="text-sirax-navy font-medium">{check.curp_validation.components.state}</span></div>
+                <div className="flex justify-between"><span className="text-slate-400">Dígito verificador</span><span className="text-sirax-navy font-medium">{check.curp_validation.check_digit_valid ? '✓ Válido' : '✗ Inválido'}</span></div>
               </div>
             )}
           </div>
@@ -965,18 +1666,18 @@ function CheckResultsView() {
           <div className="p-5 bg-white border border-slate-200 rounded-lg">
             <div className="flex items-center gap-2 mb-3">
               <Hash className="h-4 w-4 text-slate-600" strokeWidth={1.75} />
-              <h3 className="font-bold text-slate-950">RFC</h3>
+              <h3 className="font-bold text-sirax-navy">RFC</h3>
               {check.rfc_validation.is_valid ?
-                <CheckCircle2 className="h-4 w-4 text-emerald-500" /> :
+                <CheckCircle2 className="h-4 w-4 text-sirax-teal" /> :
                 <XCircle className="h-4 w-4 text-rose-500" />}
             </div>
             <div className="text-sm font-mono bg-slate-50 p-3 rounded mb-3">{check.rfc_validation.rfc}</div>
             <div className="text-sm text-slate-600">{check.rfc_validation.message}</div>
             {check.rfc_validation.components && (
               <div className="mt-3 space-y-1 text-xs">
-                <div className="flex justify-between"><span className="text-slate-400">Tipo</span><span className="text-slate-950 font-medium">{check.rfc_validation.type === 'fisica' ? 'Persona Física' : 'Persona Moral'}</span></div>
-                <div className="flex justify-between"><span className="text-slate-400">SAT Status</span><span className={`font-medium ${check.rfc_validation.sat_status === 'ACTIVO' ? 'text-emerald-600' : 'text-rose-600'}`}>{check.rfc_validation.sat_status}</span></div>
-                <div className="flex justify-between"><span className="text-slate-400">Régimen</span><span className="text-slate-950 font-medium">{check.rfc_validation.regimen_fiscal}</span></div>
+                <div className="flex justify-between"><span className="text-slate-400">Tipo</span><span className="text-sirax-navy font-medium">{check.rfc_validation.type === 'fisica' ? 'Persona Física' : 'Persona Moral'}</span></div>
+                <div className="flex justify-between"><span className="text-slate-400">SAT Status</span><span className={`font-medium ${check.rfc_validation.sat_status === 'ACTIVO' ? 'text-sirax-teal' : 'text-rose-600'}`}>{check.rfc_validation.sat_status}</span></div>
+                <div className="flex justify-between"><span className="text-slate-400">Régimen</span><span className="text-sirax-navy font-medium">{check.rfc_validation.regimen_fiscal}</span></div>
               </div>
             )}
           </div>
@@ -987,25 +1688,25 @@ function CheckResultsView() {
           <div className="p-5 bg-white border border-slate-200 rounded-lg">
             <div className="flex items-center gap-2 mb-3">
               <ShieldCheck className="h-4 w-4 text-slate-600" strokeWidth={1.75} />
-              <h3 className="font-bold text-slate-950">Government Intelligence</h3>
+              <h3 className="font-bold text-sirax-navy">Government Intelligence</h3>
             </div>
             <div className="space-y-3">
               {check.government.renapo && (
                 <div className="p-3 bg-slate-50 rounded">
                   <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">RENAPO</div>
-                  <div className="text-sm">{check.government.renapo.found ? <span className="text-emerald-600 font-medium">Registro vigente</span> : <span className="text-slate-500">No encontrado</span>}</div>
+                  <div className="text-sm">{check.government.renapo.found ? <span className="text-sirax-teal font-medium">Registro vigente</span> : <span className="text-slate-500">No encontrado</span>}</div>
                 </div>
               )}
               {check.government.sat && (
                 <div className="p-3 bg-slate-50 rounded">
                   <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">SAT</div>
-                  <div className="text-sm">Status: <span className={check.government.sat.status === 'ACTIVO' ? 'text-emerald-600' : 'text-rose-600'}>{check.government.sat.status}</span></div>
+                  <div className="text-sm">Status: <span className={check.government.sat.status === 'ACTIVO' ? 'text-sirax-teal' : 'text-rose-600'}>{check.government.sat.status}</span></div>
                 </div>
               )}
               {check.government.rnd && (
                 <div className="p-3 bg-slate-50 rounded">
                   <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">RND (Detenciones)</div>
-                  <div className="text-sm">{check.government.rnd.sin_resultados ? <span className="text-emerald-600">Sin registros</span> : <span className="text-rose-600 font-medium">Registro encontrado</span>}</div>
+                  <div className="text-sm">{check.government.rnd.sin_resultados ? <span className="text-sirax-teal">Sin registros</span> : <span className="text-rose-600 font-medium">Registro encontrado</span>}</div>
                 </div>
               )}
             </div>
@@ -1017,23 +1718,23 @@ function CheckResultsView() {
           <div className="p-5 bg-white border border-slate-200 rounded-lg">
             <div className="flex items-center gap-2 mb-3">
               <Scale className="h-4 w-4 text-slate-600" strokeWidth={1.75} />
-              <h3 className="font-bold text-slate-950">Compliance Intelligence</h3>
+              <h3 className="font-bold text-sirax-navy">Compliance Intelligence</h3>
               {check.sanctions.is_sanctioned ?
                 <XCircle className="h-4 w-4 text-rose-500" /> :
                 check.sanctions.is_pep ? <AlertTriangle className="h-4 w-4 text-amber-500" /> :
-                <CheckCircle2 className="h-4 w-4 text-emerald-500" />}
+                <CheckCircle2 className="h-4 w-4 text-sirax-teal" />}
             </div>
             <div className="text-sm mb-3">
               {check.sanctions.is_sanctioned ? <span className="text-rose-600 font-semibold">Match en listas de sanciones</span> :
                check.sanctions.is_pep ? <span className="text-amber-600 font-semibold">Persona Expuesta Políticamente (PEP)</span> :
-               <span className="text-emerald-600 font-semibold">Sin coincidencias en listas restringidas</span>}
+               <span className="text-sirax-teal font-semibold">Sin coincidencias en listas restringidas</span>}
             </div>
             {check.sanctions.matches?.length > 0 && (
               <div className="space-y-2">
                 {check.sanctions.matches.map((m: any, i: number) => (
                   <div key={i} className="p-2 rounded border border-slate-200 text-xs">
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold text-slate-950">{m.matched_name}</span>
+                      <span className="font-semibold text-sirax-navy">{m.matched_name}</span>
                       <span className="text-slate-400">{m.score}%</span>
                     </div>
                     <div className="text-slate-500">{m.list_name} · {m.type} · {m.country}</div>
@@ -1050,7 +1751,7 @@ function CheckResultsView() {
           <div className="p-5 bg-white border border-slate-200 rounded-lg">
             <div className="flex items-center gap-2 mb-3">
               <Globe2 className="h-4 w-4 text-slate-600" strokeWidth={1.75} />
-              <h3 className="font-bold text-slate-950">Digital Identity Intelligence</h3>
+              <h3 className="font-bold text-sirax-navy">Digital Identity Intelligence</h3>
             </div>
             <div className="space-y-3">
               {check.digital_identity.email && (
@@ -1059,7 +1760,7 @@ function CheckResultsView() {
                   <div className="text-sm font-mono">{check.digital_identity.email.email}</div>
                   <div className="text-xs text-slate-500 mt-1">
                     {check.digital_identity.email.is_disposable ? <span className="text-rose-600 font-semibold">DESECHEABLE</span> :
-                     check.digital_identity.email.is_corporate_business ? <span className="text-emerald-600">Corporativo</span> : 'Personal'}
+                     check.digital_identity.email.is_corporate_business ? <span className="text-sirax-teal">Corporativo</span> : 'Personal'}
                     {' · '}{check.digital_identity.email.breach_count} brechas
                   </div>
                 </div>
@@ -1091,17 +1792,17 @@ function CheckResultsView() {
           <div className="p-5 bg-white border border-slate-200 rounded-lg">
             <div className="flex items-center gap-2 mb-3">
               <Eye className="h-4 w-4 text-slate-600" strokeWidth={1.75} />
-              <h3 className="font-bold text-slate-950">Digital Footprint</h3>
+              <h3 className="font-bold text-sirax-navy">Digital Footprint</h3>
             </div>
             <div className="flex items-center gap-4 mb-4">
-              <div className="text-4xl font-extrabold tracking-tighter text-slate-950">{check.digital_footprint.presence_score}</div>
+              <div className="text-4xl font-extrabold tracking-tighter text-sirax-navy">{check.digital_footprint.presence_score}</div>
               <div>
                 <div className="text-xs uppercase tracking-wider text-slate-400">Presencia digital</div>
                 <div className="text-sm text-slate-600">{check.digital_footprint.social_profiles_count} social · {check.digital_footprint.developer_profiles_count} dev</div>
               </div>
             </div>
             {check.digital_footprint.professional_presence && (
-              <div className="text-xs text-emerald-600 font-semibold flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Presencia profesional detectada</div>
+              <div className="text-xs text-sirax-teal font-semibold flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Presencia profesional detectada</div>
             )}
           </div>
         )}
@@ -1112,7 +1813,7 @@ function CheckResultsView() {
         <div className="p-5 bg-white border border-slate-200 rounded-lg">
           <div className="flex items-center gap-2 mb-4">
             <Network className="h-4 w-4 text-slate-600" strokeWidth={1.75} />
-            <h3 className="font-bold text-slate-950">Relationship Intelligence</h3>
+            <h3 className="font-bold text-sirax-navy">Relationship Intelligence</h3>
             <span className="text-xs text-slate-400 ml-2">{check.relationship_graph.analysis?.total_nodes} nodos · {check.relationship_graph.analysis?.total_edges} conexiones</span>
           </div>
           {check.relationship_graph.analysis?.suspicious_patterns?.length > 0 && (
@@ -1126,8 +1827,8 @@ function CheckResultsView() {
             {check.relationship_graph.graph?.nodes?.map((n: any) => (
               <div key={n.data.id}
                 className={`px-3 py-2 rounded-md border text-xs font-medium ${
-                  n.data.type === 'Person' ? 'bg-slate-100 border-slate-300 text-slate-950' :
-                  n.data.type === 'Email' ? 'bg-blue-50 border-blue-200 text-blue-700' :
+                  n.data.type === 'Person' ? 'bg-slate-100 border-slate-300 text-sirax-navy' :
+                  n.data.type === 'Email' ? 'bg-sky-50 border-sky-200 text-sky-700' :
                   n.data.type === 'Phone' ? 'bg-cyan-50 border-cyan-200 text-cyan-700' :
                   n.data.type === 'Curp' ? 'bg-purple-50 border-purple-200 text-purple-700' :
                   n.data.type === 'Rfc' ? 'bg-violet-50 border-violet-200 text-violet-700' :
@@ -1147,15 +1848,15 @@ function CheckResultsView() {
         <div className="p-5 bg-white border border-slate-200 rounded-lg">
           <div className="flex items-center gap-2 mb-4">
             <Target className="h-4 w-4 text-slate-600" strokeWidth={1.75} />
-            <h3 className="font-bold text-slate-950">Score Breakdown</h3>
+            <h3 className="font-bold text-sirax-navy">Score Breakdown</h3>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <div className="text-xs font-bold uppercase tracking-wider text-emerald-600 mb-2">Factores positivos (Trust)</div>
+              <div className="text-xs font-bold uppercase tracking-wider text-sirax-teal mb-2">Factores positivos (Trust)</div>
               {check.breakdown.trust_components?.map((c: any, i: number) => (
                 <div key={i} className="flex items-center justify-between text-sm py-1">
                   <span className="text-slate-600">{c.label}</span>
-                  <span className="text-emerald-600 font-semibold">+{c.points}</span>
+                  <span className="text-sirax-teal font-semibold">+{c.points}</span>
                 </div>
               ))}
             </div>
@@ -1176,13 +1877,14 @@ function CheckResultsView() {
       {check.ai_report && (
         <div className="p-5 bg-white border border-slate-200 rounded-lg">
           <div className="flex items-center gap-2 mb-4">
-            <Brain className="h-4 w-4 text-slate-600" strokeWidth={1.75} />
-            <h3 className="font-bold text-slate-950">AI Investigation Report</h3>
+            <Brain className="h-4 w-4 text-sirax-teal" strokeWidth={1.75} />
+            <h3 className="font-bold text-sirax-navy">AI Investigation Report</h3>
+            <span className="ml-2 px-2 py-0.5 rounded text-[10px] font-semibold bg-sirax-teal/10 text-sirax-teal uppercase tracking-wider">sirax · AI</span>
           </div>
           <div className="prose prose-sm max-w-none text-slate-700">
             {check.ai_report.split('\n').map((line: string, i: number) => {
-              if (line.startsWith('## ')) return <h2 key={i} className="text-lg font-bold text-slate-950 mt-4 mb-2">{line.slice(3)}</h2>
-              if (line.startsWith('**') && line.endsWith('**')) return <p key={i} className="font-semibold text-slate-950">{line.replace(/\*\*/g, '')}</p>
+              if (line.startsWith('## ')) return <h2 key={i} className="text-lg font-bold text-sirax-navy mt-4 mb-2">{line.slice(3)}</h2>
+              if (line.startsWith('**') && line.endsWith('**')) return <p key={i} className="font-semibold text-sirax-navy">{line.replace(/\*\*/g, '')}</p>
               if (line.trim() === '') return <br key={i} />
               return <p key={i} className="mb-1">{line}</p>
             })}
@@ -1230,11 +1932,11 @@ function HistoryView() {
     <div className="p-6 lg:p-8 space-y-6">
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
         <div>
-          <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-600 mb-1.5">Historial</div>
-          <h1 className="text-3xl font-extrabold tracking-tighter text-slate-950">Background Checks</h1>
+          <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-sirax-teal mb-1.5">Historial</div>
+          <h1 className="text-3xl font-extrabold tracking-tighter text-sirax-navy">Background Checks</h1>
         </div>
         <button onClick={() => navigate('new-check')}
-          className="inline-flex items-center gap-2 bg-slate-950 text-white px-5 py-2.5 rounded-md font-semibold text-sm">
+          className="inline-flex items-center gap-2 bg-sirax-navy text-white px-5 py-2.5 rounded-md font-semibold text-sm hover:bg-sirax-navy-soft transition-colors">
           <Plus className="h-4 w-4" /> Nuevo Check
         </button>
       </div>
@@ -1243,7 +1945,7 @@ function HistoryView() {
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <input value={search} onChange={e => setSearch(e.target.value)}
-            className="w-full pl-10 pr-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-950"
+            className="w-full pl-10 pr-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal"
             placeholder="Buscar por nombre..." />
         </div>
         <select value={riskFilter} onChange={e => setRiskFilter(e.target.value)}
@@ -1272,8 +1974,8 @@ function HistoryView() {
             <tbody>
               {checks.map((c: any) => (
                 <tr key={c.id} className="border-t border-slate-100 hover:bg-slate-50 cursor-pointer" onClick={() => navigate('check-results', { checkId: c.id })}>
-                  <td className="px-4 py-3 text-sm font-medium text-slate-950">{c.subject?.full_name}</td>
-                  <td className="px-4 py-3 text-sm font-bold text-emerald-600">{c.trust_score}</td>
+                  <td className="px-4 py-3 text-sm font-medium text-sirax-navy">{c.subject?.full_name}</td>
+                  <td className="px-4 py-3 text-sm font-bold text-sirax-teal">{c.trust_score}</td>
                   <td className="px-4 py-3 text-sm font-bold" style={{ color: RISK_COLORS[c.risk_level] }}>{c.risk_score}</td>
                   <td className="px-4 py-3">
                     <span className="px-2 py-0.5 rounded text-xs font-bold text-white" style={{ backgroundColor: RISK_COLORS[c.risk_level] }}>{c.risk_level}</span>
@@ -1314,27 +2016,27 @@ function CurpValidatorView() {
 
   return (
     <div className="p-6 lg:p-8 max-w-2xl mx-auto">
-      <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-600 mb-1.5">Herramienta</div>
-      <h1 className="text-3xl font-extrabold tracking-tighter text-slate-950 mb-2">Validador de CURP</h1>
+      <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-sirax-teal mb-1.5">Herramienta</div>
+      <h1 className="text-3xl font-extrabold tracking-tighter text-sirax-navy mb-2">Validador de CURP</h1>
       <p className="text-sm text-slate-500 mb-6">Validación contra algoritmo oficial mexicano con dígito verificador.</p>
 
       <div className="bg-white p-6 rounded-lg border border-slate-200 space-y-4">
         <div>
           <label className="text-sm font-medium text-slate-700 mb-1 block">CURP</label>
           <input value={curp} onChange={e => setCurp(e.target.value.toUpperCase())} maxLength={18}
-            className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-950"
+            className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal"
             placeholder="PEGJ800101HDFRRN09" />
         </div>
         <button onClick={validate} disabled={loading || !curp}
-          className="bg-slate-950 text-white px-5 py-2.5 rounded-md font-semibold text-sm hover:bg-slate-800 disabled:opacity-50">
+          className="bg-sirax-navy text-white px-5 py-2.5 rounded-md font-semibold text-sm hover:bg-sirax-navy-soft disabled:opacity-50">
           {loading ? 'Validando...' : 'Validar CURP'}
         </button>
       </div>
 
       {result && (
-        <div className={`mt-6 p-6 rounded-lg border ${result.is_valid ? 'border-emerald-200 bg-emerald-50' : 'border-rose-200 bg-rose-50'}`}>
+        <div className={`mt-6 p-6 rounded-lg border ${result.is_valid ? 'border-sirax-teal/40 bg-sirax-teal/5' : 'border-rose-200 bg-rose-50'}`}>
           <div className="flex items-center gap-2 mb-3">
-            {result.is_valid ? <CheckCircle2 className="h-5 w-5 text-emerald-600" /> : <XCircle className="h-5 w-5 text-rose-600" />}
+            {result.is_valid ? <CheckCircle2 className="h-5 w-5 text-sirax-teal" /> : <XCircle className="h-5 w-5 text-rose-600" />}
             <span className="font-bold text-lg">{result.is_valid ? 'CURP Válido' : 'CURP Inválido'}</span>
           </div>
           <p className="text-sm">{result.message}</p>
@@ -1370,27 +2072,27 @@ function RfcValidatorView() {
 
   return (
     <div className="p-6 lg:p-8 max-w-2xl mx-auto">
-      <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-600 mb-1.5">Herramienta</div>
-      <h1 className="text-3xl font-extrabold tracking-tighter text-slate-950 mb-2">Validador de RFC</h1>
+      <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-sirax-teal mb-1.5">Herramienta</div>
+      <h1 className="text-3xl font-extrabold tracking-tighter text-sirax-navy mb-2">Validador de RFC</h1>
       <p className="text-sm text-slate-500 mb-6">Validación para persona física (13) y moral (12) con verificación SAT.</p>
 
       <div className="bg-white p-6 rounded-lg border border-slate-200 space-y-4">
         <div>
           <label className="text-sm font-medium text-slate-700 mb-1 block">RFC</label>
           <input value={rfc} onChange={e => setRfc(e.target.value.toUpperCase())} maxLength={13}
-            className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-950"
+            className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal"
             placeholder="PEGJ800101AB1" />
         </div>
         <button onClick={validate} disabled={loading || !rfc}
-          className="bg-slate-950 text-white px-5 py-2.5 rounded-md font-semibold text-sm hover:bg-slate-800 disabled:opacity-50">
+          className="bg-sirax-navy text-white px-5 py-2.5 rounded-md font-semibold text-sm hover:bg-sirax-navy-soft disabled:opacity-50">
           {loading ? 'Validando...' : 'Validar RFC'}
         </button>
       </div>
 
       {result && (
-        <div className={`mt-6 p-6 rounded-lg border ${result.is_valid ? 'border-emerald-200 bg-emerald-50' : 'border-rose-200 bg-rose-50'}`}>
+        <div className={`mt-6 p-6 rounded-lg border ${result.is_valid ? 'border-sirax-teal/40 bg-sirax-teal/5' : 'border-rose-200 bg-rose-50'}`}>
           <div className="flex items-center gap-2 mb-3">
-            {result.is_valid ? <CheckCircle2 className="h-5 w-5 text-emerald-600" /> : <XCircle className="h-5 w-5 text-rose-600" />}
+            {result.is_valid ? <CheckCircle2 className="h-5 w-5 text-sirax-teal" /> : <XCircle className="h-5 w-5 text-rose-600" />}
             <span className="font-bold text-lg">{result.is_valid ? 'RFC Válido' : 'RFC Inválido'}</span>
           </div>
           <p className="text-sm">{result.message}</p>
@@ -1398,7 +2100,7 @@ function RfcValidatorView() {
             <div className="mt-4 space-y-2 text-sm">
               <div className="flex justify-between"><span className="text-slate-500">Tipo</span><span className="font-medium">{result.type === 'fisica' ? 'Persona Física' : 'Persona Moral'}</span></div>
               <div className="flex justify-between"><span className="text-slate-500">Fecha</span><span className="font-medium">{result.components.date}</span></div>
-              <div className="flex justify-between"><span className="text-slate-500">SAT Status</span><span className={`font-medium ${result.sat_status === 'ACTIVO' ? 'text-emerald-600' : 'text-rose-600'}`}>{result.sat_status}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">SAT Status</span><span className={`font-medium ${result.sat_status === 'ACTIVO' ? 'text-sirax-teal' : 'text-rose-600'}`}>{result.sat_status}</span></div>
             </div>
           )}
         </div>
@@ -1425,27 +2127,27 @@ function SanctionsView() {
 
   return (
     <div className="p-6 lg:p-8 max-w-3xl mx-auto">
-      <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-600 mb-1.5">Herramienta</div>
-      <h1 className="text-3xl font-extrabold tracking-tighter text-slate-950 mb-2">Screening de Sanciones</h1>
+      <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-sirax-teal mb-1.5">Herramienta</div>
+      <h1 className="text-3xl font-extrabold tracking-tighter text-sirax-navy mb-2">Screening de Sanciones</h1>
       <p className="text-sm text-slate-500 mb-6">Fuzzy matching contra OFAC, ONU, PEP, SAT 69-B, Interpol y más.</p>
 
       <div className="bg-white p-6 rounded-lg border border-slate-200 space-y-4">
         <div>
           <label className="text-sm font-medium text-slate-700 mb-1 block">Nombre completo</label>
           <input value={name} onChange={e => setName(e.target.value)}
-            className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-950"
+            className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal"
             placeholder="Juan Pérez García" />
         </div>
         <button onClick={screen} disabled={loading || !name}
-          className="bg-slate-950 text-white px-5 py-2.5 rounded-md font-semibold text-sm hover:bg-slate-800 disabled:opacity-50">
+          className="bg-sirax-navy text-white px-5 py-2.5 rounded-md font-semibold text-sm hover:bg-sirax-navy-soft disabled:opacity-50">
           {loading ? 'Screening...' : 'Ejecutar Screening'}
         </button>
       </div>
 
       {result && (
-        <div className={`mt-6 p-6 rounded-lg border ${result.is_sanctioned ? 'border-rose-200 bg-rose-50' : result.is_pep ? 'border-amber-200 bg-amber-50' : 'border-emerald-200 bg-emerald-50'}`}>
+        <div className={`mt-6 p-6 rounded-lg border ${result.is_sanctioned ? 'border-rose-200 bg-rose-50' : result.is_pep ? 'border-amber-200 bg-amber-50' : 'border-sirax-teal/40 bg-sirax-teal/5'}`}>
           <div className="flex items-center gap-2 mb-3">
-            {result.is_sanctioned ? <XCircle className="h-5 w-5 text-rose-600" /> : result.is_pep ? <AlertTriangle className="h-5 w-5 text-amber-600" /> : <CheckCircle2 className="h-5 w-5 text-emerald-600" />}
+            {result.is_sanctioned ? <XCircle className="h-5 w-5 text-rose-600" /> : result.is_pep ? <AlertTriangle className="h-5 w-5 text-amber-600" /> : <CheckCircle2 className="h-5 w-5 text-sirax-teal" />}
             <span className="font-bold text-lg">
               {result.is_sanctioned ? 'Match en Listas de Sanciones' : result.is_pep ? 'Persona Expuesta Políticamente' : 'Sin Coincidencias'}
             </span>
@@ -1453,11 +2155,11 @@ function SanctionsView() {
 
           {result.matches?.length > 0 && (
             <div className="mt-4 space-y-3">
-              <h4 className="text-sm font-bold text-slate-950">Coincidencias:</h4>
+              <h4 className="text-sm font-bold text-sirax-navy">Coincidencias:</h4>
               {result.matches.map((m: any, i: number) => (
                 <div key={i} className="p-3 bg-white rounded border border-slate-200">
                   <div className="flex items-center justify-between">
-                    <span className="font-semibold text-slate-950">{m.matched_name}</span>
+                    <span className="font-semibold text-sirax-navy">{m.matched_name}</span>
                     <span className="px-2 py-0.5 rounded text-xs font-bold bg-slate-100">{m.score}%</span>
                   </div>
                   <div className="text-xs text-slate-500 mt-1">{m.list_name} · {m.type} · {m.country} · {m.program}</div>
@@ -1496,8 +2198,8 @@ function ApiDocsView() {
 
   return (
     <div className="p-6 lg:p-8 max-w-4xl mx-auto">
-      <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-600 mb-1.5">Documentación</div>
-      <h1 className="text-3xl font-extrabold tracking-tighter text-slate-950 mb-2">API Reference</h1>
+      <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-sirax-teal mb-1.5">Documentación</div>
+      <h1 className="text-3xl font-extrabold tracking-tighter text-sirax-navy mb-2">API Reference</h1>
       <p className="text-sm text-slate-500 mb-6">REST API para integraciones con CRMs, ERPs, fintechs y bancos.</p>
 
       <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
@@ -1514,9 +2216,9 @@ function ApiDocsView() {
             {endpoints.map((ep, i) => (
               <tr key={i} className="border-t border-slate-100">
                 <td className="px-4 py-3">
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${ep.method === 'POST' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>{ep.method}</span>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${ep.method === 'POST' ? 'bg-sirax-teal/15 text-sirax-teal' : 'bg-sky-100 text-sky-700'}`}>{ep.method}</span>
                 </td>
-                <td className="px-4 py-3 text-xs font-mono text-slate-950">{ep.path}</td>
+                <td className="px-4 py-3 text-xs font-mono text-sirax-navy">{ep.path}</td>
                 <td className="px-4 py-3 text-sm text-slate-600">{ep.desc}</td>
                 <td className="px-4 py-3 text-xs font-mono text-slate-400">{ep.body}</td>
               </tr>
@@ -1525,8 +2227,11 @@ function ApiDocsView() {
         </table>
       </div>
 
-      <div className="mt-8 p-6 bg-slate-950 rounded-lg text-white">
-        <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Ejemplo: Background Check completo</div>
+      <div className="mt-8 p-6 bg-sirax-navy rounded-lg text-white">
+        <div className="flex items-center justify-between mb-3">
+          <div className="text-xs font-bold uppercase tracking-wider text-slate-400">Ejemplo: Background Check completo</div>
+          <span className="text-[10px] font-mono text-sirax-teal">sirax API · v1</span>
+        </div>
         <pre className="text-xs font-mono text-slate-300 leading-relaxed overflow-x-auto">{`curl -X POST /api/checks \\
   -H "Authorization: Bearer YOUR_TOKEN" \\
   -H "Content-Type: application/json" \\
@@ -1545,19 +2250,6 @@ function ApiDocsView() {
   )
 }
 
-// ==================== Seed Admin User ====================
-function useSeedAdmin() {
-  const { token } = useAuth()
-  const [seeded, setSeeded] = useState(false)
-  useEffect(() => {
-    if (!seeded) {
-      API.post('/api/auth/register', {
-        email: 'admin@synkdata.mx', password: 'Admin2026!', fullName: 'Admin SynkData', role: 'admin', organization: 'SynkData'
-      }).then(() => setSeeded(true)).catch(() => setSeeded(true))
-    }
-  }, [seeded])
-}
-
 // ==================== Main App ====================
 export default function Home() {
   const [view, setView] = useState<View>('landing')
@@ -1567,8 +2259,8 @@ export default function Home() {
 
   // After mount, read localStorage and set correct view
   useEffect(() => {
-    const savedView = localStorage.getItem('synkdata_view') as View | null
-    const token = localStorage.getItem('synkdata_token')
+    const savedView = (localStorage.getItem('sirax_view') || localStorage.getItem('synkdata_view')) as View | null
+    const token = localStorage.getItem('sirax_token') || localStorage.getItem('synkdata_token')
     if (token && user) {
       setView(savedView && savedView !== 'landing' && savedView !== 'login' && savedView !== 'register' ? savedView : 'dashboard')
     } else if (token && !user) {
@@ -1586,7 +2278,7 @@ export default function Home() {
     if (!mounted) return
     if (user && (view === 'landing' || view === 'login' || view === 'register')) {
       setView('dashboard')
-      localStorage.setItem('synkdata_view', 'dashboard')
+      localStorage.setItem('sirax_view', 'dashboard')
     }
     // eslint-disable-next-line react-hooks/set-state-in-effect
   }, [user, mounted, view])
@@ -1595,7 +2287,7 @@ export default function Home() {
     setView(v)
     setViewData(data || null)
     if (typeof window !== 'undefined') {
-      localStorage.setItem('synkdata_view', v)
+      localStorage.setItem('sirax_view', v)
     }
   }, [])
 
@@ -1620,8 +2312,10 @@ export default function Home() {
   }
 
   return (
-    <RouterContext.Provider value={{ view, navigate, viewData }}>
-      {renderView()}
-    </RouterContext.Provider>
+    <AuthProvider>
+      <RouterContext.Provider value={{ view, navigate, viewData }}>
+        {renderView()}
+      </RouterContext.Provider>
+    </AuthProvider>
   )
 }

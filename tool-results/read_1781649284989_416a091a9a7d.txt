@@ -1,0 +1,1628 @@
+     1→'use client'
+     2→
+     3→import React, { useState, useEffect, useCallback, createContext, useContext } from 'react'
+     4→import {
+     5→  ShieldCheck, ArrowRight, IdCard, Scale, Globe2, Network,
+     6→  Brain, BarChart3, Plug, Lock, Eye, CheckCircle2, ChevronRight,
+     7→  FileSearch, ShieldAlert, TrendingUp, AlertTriangle, XCircle,
+     8→  Search, Phone, Mail, User, MapPin, Calendar, Hash,
+     9→  ChevronLeft, Activity, Database, ExternalLink, Copy, RefreshCw,
+    10→  Menu, X, LogOut, Plus, Filter, Download, Zap, Target,
+    11→  GitBranch, Linkedin, Github, Instagram, Twitter, MessageCircle,
+    12→  BookOpen, Code2, Building2, Flag
+    13→} from 'lucide-react'
+    14→import {
+    15→  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+    16→  PieChart, Pie, Cell, Legend, LineChart, Line,
+    17→  ResponsiveContainer, RadialBarChart, RadialBar,
+    18→} from 'recharts'
+    19→import { useToast } from '@/hooks/use-toast'
+    20→
+    21→// ==================== API Helper ====================
+    22→const API = {
+    23→  get: async (path: string, token?: string) => {
+    24→    const res = await fetch(path, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+    25→    return res.json()
+    26→  },
+    27→  post: async (path: string, body: any, token?: string) => {
+    28→    const res = await fetch(path, {
+    29→      method: 'POST',
+    30→      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    31→      body: JSON.stringify(body),
+    32→    })
+    33→    return res.json()
+    34→  },
+    35→  del: async (path: string, token: string) => {
+    36→    const res = await fetch(path, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
+    37→    return res.json()
+    38→  },
+    39→}
+    40→
+    41→// ==================== Auth Context ====================
+    42→type User = { id: string; email: string; full_name: string; role: string; organization?: string }
+    43→
+    44→const AuthContext = createContext<{
+    45→  user: User | null; token: string | null; login: (t: string, u: User) => void; logout: () => void
+    46→}>({ user: null, token: null, login: () => {}, logout: () => {} })
+    47→
+    48→function AuthProvider({ children }: { children: React.ReactNode }) {
+    49→  const [user, setUser] = useState<User | null>(null)
+    50→  const [token, setToken] = useState<string | null>(null)
+    51→  const [ready, setReady] = useState(false)
+    52→
+    53→  useEffect(() => {
+    54→    // Read from localStorage on mount - this is the only safe place
+    55→    const t = localStorage.getItem('synkdata_token')
+    56→    const u = localStorage.getItem('synkdata_user')
+    57→    if (t) setToken(t)
+    58→    if (u) {
+    59→      try { setUser(JSON.parse(u)) } catch {}
+    60→    }
+    61→    setReady(true)
+    62→    // eslint-disable-next-line react-hooks/set-state-in-effect
+    63→  }, [])
+    64→
+    65→  const login = (t: string, u: User) => {
+    66→    localStorage.setItem('synkdata_token', t)
+    67→    localStorage.setItem('synkdata_user', JSON.stringify(u))
+    68→    setToken(t); setUser(u)
+    69→  }
+    70→
+    71→  const logout = () => {
+    72→    localStorage.removeItem('synkdata_token')
+    73→    localStorage.removeItem('synkdata_user')
+    74→    localStorage.removeItem('synkdata_view')
+    75→    setToken(null); setUser(null)
+    76→  }
+    77→
+    78→  // Show nothing during SSR/hydration to avoid mismatch
+    79→  if (!ready) {
+    80→    return <div className="min-h-screen bg-white" />
+    81→  }
+    82→
+    83→  return <AuthContext.Provider value={{ user, token, login, logout }}>{children}</AuthContext.Provider>
+    84→}
+    85→
+    86→function useAuth() { return useContext(AuthContext) }
+    87→
+    88→// Helper to get token - falls back to localStorage if context token is null
+    89→function useToken(): string | null {
+    90→  const { token } = useAuth()
+    91→  if (token) return token
+    92→  if (typeof window !== 'undefined') return localStorage.getItem('synkdata_token')
+    93→  return null
+    94→}
+    95→
+    96→// ==================== View Router ====================
+    97→type View = 'landing' | 'login' | 'register' | 'dashboard' | 'new-check' | 'history' | 'check-results' | 'curp' | 'rfc' | 'sanctions' | 'api-docs'
+    98→
+    99→const RouterContext = createContext<{ view: View; navigate: (v: View, data?: any) => void; viewData: any }>({
+   100→  view: 'landing', navigate: () => {}, viewData: null
+   101→})
+   102→
+   103→function useRouter() { return useContext(RouterContext) }
+   104→
+   105→// ==================== Constants ====================
+   106→const RISK_COLORS: Record<string, string> = { BAJO: '#10b981', MEDIO: '#f59e0b', ALTO: '#ef4444', CRITICO: '#9f1239' }
+   107→const REC_COLORS: Record<string, string> = { APPROVE: '#10b981', REVIEW: '#f59e0b', REJECT: '#ef4444' }
+   108→const REC_LABEL: Record<string, string> = { APPROVE: 'Aprobar', REVIEW: 'Revisar', REJECT: 'Rechazar' }
+   109→
+   110→// ==================== Landing Module Card ====================
+   111→function LandingModule({ icon: Icon, title, desc, items }: { icon: any; title: string; desc: string; items: string[] }) {
+   112→  return (
+   113→    <div className="group p-6 bg-white border border-slate-200 rounded-lg hover:border-slate-950 transition-colors">
+   114→      <div className="flex items-center justify-between mb-4">
+   115→        <div className="h-10 w-10 bg-slate-950 text-white flex items-center justify-center rounded-md group-hover:scale-110 transition-transform">
+   116→          <Icon className="h-5 w-5" strokeWidth={1.75} />
+   117→        </div>
+   118→        <ChevronRight className="h-4 w-4 text-slate-300 group-hover:text-slate-950 group-hover:translate-x-1 transition-all" />
+   119→      </div>
+   120→      <h3 className="font-bold text-slate-950 text-lg mb-2">{title}</h3>
+   121→      <p className="text-sm text-slate-500 mb-3 leading-relaxed">{desc}</p>
+   122→      <ul className="space-y-1">
+   123→        {items.map((it: string) => (
+   124→          <li key={it} className="text-xs text-slate-600 font-mono flex items-center gap-1.5">
+   125→            <CheckCircle2 className="h-3 w-3 text-emerald-600" strokeWidth={2.5} />{it}
+   126→          </li>
+   127→        ))}
+   128→      </ul>
+   129→    </div>
+   130→  )
+   131→}
+   132→
+   133→// ==================== Landing Page ====================
+   134→function LandingView() {
+   135→  const { navigate } = useRouter()
+   136→  const { user } = useAuth()
+   137→
+   138→  return (
+   139→    <div className="min-h-screen bg-white">
+   140→      {/* Nav */}
+   141→      <header className="fixed top-0 inset-x-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200">
+   142→        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+   143→          <button onClick={() => navigate('landing')} className="flex items-center gap-2">
+   144→            <div className="h-8 w-8 bg-slate-950 text-white flex items-center justify-center rounded-md">
+   145→              <ShieldCheck className="h-5 w-5" strokeWidth={2} />
+   146→            </div>
+   147→            <span className="font-bold tracking-tight text-slate-950">SynkData</span>
+   148→            <span className="hidden sm:inline text-[10px] uppercase tracking-[0.2em] text-slate-400 ml-1">Identity Intelligence</span>
+   149→          </button>
+   150→          <div className="flex items-center gap-3">
+   151→            {user ? (
+   152→              <button onClick={() => navigate('dashboard')} className="text-sm font-semibold bg-slate-950 text-white px-4 py-2 rounded-md hover:bg-slate-800 transition-colors">
+   153→                Ir al Dashboard
+   154→              </button>
+   155→            ) : (
+   156→              <>
+   157→                <button onClick={() => navigate('login')} className="text-sm font-medium text-slate-600 hover:text-slate-950">Iniciar sesión</button>
+   158→                <button onClick={() => navigate('register')} className="text-sm font-semibold bg-slate-950 text-white px-4 py-2 rounded-md hover:bg-slate-800 transition-colors">
+   159→                  Crear cuenta
+   160→                </button>
+   161→              </>
+   162→            )}
+   163→          </div>
+   164→        </div>
+   165→      </header>
+   166→
+   167→      {/* Hero */}
+   168→      <section className="relative bg-slate-950 text-white pt-32 pb-24 overflow-hidden">
+   169→        <div className="absolute -top-32 -right-32 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl" />
+   170→        <div className="relative max-w-7xl mx-auto px-6 grid lg:grid-cols-12 gap-12">
+   171→          <div className="lg:col-span-7">
+   172→            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-slate-700 bg-slate-900/50 text-xs font-medium text-slate-300 mb-6">
+   173→              <span className="h-1.5 w-1.5 bg-emerald-500 rounded-full animate-pulse" />
+   174→              Plataforma operativa · México y LATAM
+   175→            </div>
+   176→            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tighter leading-[1.05] mb-6">
+   177→              Identity Intelligence.<br />
+   178→              <span className="text-slate-400">Background Checks.</span><br />
+   179→              Risk Intelligence.
+   180→            </h1>
+   181→            <p className="text-base sm:text-lg text-slate-400 max-w-xl mb-8 leading-relaxed">
+   182→              SynkData centraliza fuentes gubernamentales, listas regulatorias internacionales,
+   183→              inteligencia digital y análisis relacional para entregar una visión completa de
+   184→              identidad y riesgo en segundos.
+   185→            </p>
+   186→            <div className="flex flex-wrap items-center gap-3">
+   187→              <button onClick={() => navigate(user ? 'dashboard' : 'register')} className="inline-flex items-center gap-2 bg-white text-slate-950 px-5 py-3 rounded-md font-semibold text-sm hover:-translate-y-0.5 transition-transform">
+   188→                Comenzar ahora <ArrowRight className="h-4 w-4" />
+   189→              </button>
+   190→              <button onClick={() => navigate('login')} className="inline-flex items-center gap-2 border border-slate-700 px-5 py-3 rounded-md font-semibold text-sm hover:bg-slate-900 transition-colors">
+   191→                Acceder a la consola
+   192→              </button>
+   193→            </div>
+   194→            <div className="mt-12 grid grid-cols-3 gap-6 max-w-md">
+   195→              {[
+   196→                { v: '+15', l: 'Fuentes integradas' },
+   197→                { v: '<2s', l: 'Tiempo de respuesta' },
+   198→                { v: '99.9%', l: 'Disponibilidad' },
+   199→              ].map(s => (
+   200→                <div key={s.l}>
+   201→                  <div className="text-2xl font-bold tracking-tight">{s.v}</div>
+   202→                  <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500 mt-1">{s.l}</div>
+   203→                </div>
+   204→              ))}
+   205→            </div>
+   206→          </div>
+   207→          <div className="lg:col-span-5 relative">
+   208→            <div className="relative rounded-lg border border-slate-800 bg-slate-900/50 backdrop-blur-sm p-5 shadow-2xl">
+   209→              <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-3">Live demo · Trust Score</div>
+   210→              <div className="flex items-end gap-6 mb-5">
+   211→                <div className="text-7xl font-extrabold tracking-tighter">92</div>
+   212→                <div>
+   213→                  <div className="px-2 py-0.5 rounded text-xs font-bold bg-emerald-500 text-white">BAJO RIESGO</div>
+   214→                  <div className="text-xs text-slate-400 mt-1">Recomendación: APROBAR</div>
+   215→                </div>
+   216→              </div>
+   217→              <div className="space-y-2.5 text-xs">
+   218→                {[
+   219→                  ['CURP', 'Verificado RENAPO'],
+   220→                  ['RFC', 'Activo en SAT'],
+   221→                  ['OFAC / ONU', 'Sin coincidencias'],
+   222→                  ['RND', 'Sin registros'],
+   223→                  ['Email', 'Corporativo, 0 brechas'],
+   224→                  ['LinkedIn', 'Perfil profesional'],
+   225→                  ['GitHub', 'Cuenta activa · 4 años'],
+   226→                ].map(([k, v]) => (
+   227→                  <div key={k} className="flex items-center justify-between p-2 rounded border border-slate-800 bg-slate-950/40">
+   228→                    <span className="text-slate-400">{k}</span>
+   229→                    <div className="flex items-center gap-1.5 text-slate-200 font-medium">
+   230→                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" strokeWidth={2.5} />{v}
+   231→                    </div>
+   232→                  </div>
+   233→                ))}
+   234→              </div>
+   235→            </div>
+   236→          </div>
+   237→        </div>
+   238→      </section>
+   239→
+   240→      {/* Modules */}
+   241→      <section className="py-24 bg-slate-50">
+   242→        <div className="max-w-7xl mx-auto px-6">
+   243→          <div className="max-w-2xl mb-12">
+   244→            <div className="text-xs font-bold uppercase tracking-[0.2em] text-blue-600 mb-3">Arquitectura</div>
+   245→            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-950 mb-4">
+   246→              Una sola plataforma. Diez módulos de inteligencia.
+   247→            </h2>
+   248→          </div>
+   249→          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+   250→            <LandingModule icon={IdCard} title="Identity Verification" desc="Validación de identidad oficial mexicana con algoritmo y registros."
+   251→              items={['CURP · dígito verificador', 'RFC PF · PM · Homoclave', 'RENAPO · SAT · IMSS']} />
+   252→            <LandingModule icon={ShieldCheck} title="Government Intelligence" desc="Consulta de fuentes gubernamentales y registros oficiales."
+   253→              items={['RENAPO · SAT · IMSS', 'RND (SSPC)', 'DOF · SCJN']} />
+   254→            <LandingModule icon={Scale} title="Compliance Intelligence" desc="Screening contra listas restrictivas globales y locales."
+   255→              items={['OFAC · ONU · Interpol', 'OpenSanctions · EU · UK', 'SAT 69-B · PEP México']} />
+   256→            <LandingModule icon={Globe2} title="Digital Identity Intelligence" desc="Verificación profunda de email, teléfono y aliases."
+   257→              items={['HIBP · Hunter · MX Records', 'Operador · spam · línea', 'Sherlock · Maigret']} />
+   258→            <LandingModule icon={Eye} title="Digital Footprint" desc="Descubrimiento de presencia en plataformas sociales."
+   259→              items={['LinkedIn · GitHub · X', 'Instagram · Reddit · TikTok', 'Discord · Telegram · Medium']} />
+   260→            <LandingModule icon={Network} title="Relationship Intelligence" desc="Knowledge graph con detección de patrones sospechosos."
+   261→              items={['Entity Resolution', 'Visualización interactiva', 'Detección de redes ocultas']} />
+   262→            <LandingModule icon={BarChart3} title="Risk Intelligence Engine" desc="Trust Score y Risk Score ponderados con recomendación."
+   263→              items={['Trust 0-100 · Risk 0-100', 'Identity Confidence', 'APPROVE · REVIEW · REJECT']} />
+   264→            <LandingModule icon={Brain} title="AI Investigation Engine" desc="Reportes automáticos en español con análisis multi-fuente."
+   265→              items={['Resumen ejecutivo', 'Análisis multi-fuente', 'Recomendación final']} />
+   266→            <LandingModule icon={Plug} title="API & Integrations" desc="REST API documentada para CRMs, ERPs, fintechs y bancos."
+   267→              items={['POST /verify · /curp · /rfc', 'POST /screening · /identity', 'Webhooks · SDKs']} />
+   268→          </div>
+   269→        </div>
+   270→      </section>
+   271→
+   272→      {/* Coverage */}
+   273→      <section className="py-24 bg-white border-y border-slate-200">
+   274→        <div className="max-w-7xl mx-auto px-6">
+   275→          <div className="text-xs font-bold uppercase tracking-[0.2em] text-blue-600 mb-3">Cobertura</div>
+   276→          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-950 mb-5">
+   277→            Sin reemplazar tus integraciones. Las potencia.
+   278→          </h2>
+   279→          <p className="text-slate-500 mb-6 leading-relaxed max-w-2xl">
+   280→            SynkData se diseñó como capa unificadora: consume tus integraciones existentes
+   281→            y las correlaciona en una vista 360° del sujeto con scoring estandarizado y reporte AI.
+   282→          </p>
+   283→          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-2xl">
+   284→            {['RENAPO', 'SAT', 'IMSS', 'RND', 'OFAC', 'ONU', 'OpenSanctions', 'SAT 69-B', 'HaveIBeenPwned', 'Hunter.io', 'NumVerify', 'Sherlock'].map(s => (
+   285→              <div key={s} className="px-3 py-2 rounded-md border border-slate-200 bg-slate-50 text-xs font-mono font-medium text-slate-700">{s}</div>
+   286→            ))}
+   287→          </div>
+   288→        </div>
+   289→      </section>
+   290→
+   291→      {/* API CTA */}
+   292→      <section className="py-24 bg-slate-950 text-white relative overflow-hidden">
+   293→        <div className="relative max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-12 items-center">
+   294→          <div>
+   295→            <Lock className="h-7 w-7 mb-4 text-blue-400" strokeWidth={1.75} />
+   296→            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">Una API. Toda la inteligencia.</h2>
+   297→            <p className="text-slate-400 mb-8 max-w-md">
+   298→              Diseñada para CRMs, fintechs, ERPs, bancos, marketplaces y plataformas de RH.
+   299→              Verifica identidad, evalúa riesgo y obtén un reporte AI en una sola llamada.
+   300→            </p>
+   301→            <button onClick={() => navigate('register')} className="inline-flex items-center gap-2 bg-white text-slate-950 px-5 py-3 rounded-md font-semibold text-sm hover:-translate-y-0.5 transition-transform">
+   302→              Solicitar acceso <ArrowRight className="h-4 w-4" />
+   303→            </button>
+   304→          </div>
+   305→          <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-5 font-mono text-xs leading-6 text-slate-300">
+   306→            <div className="text-slate-500 mb-1"># Background check completo</div>
+   307→            <div><span className="text-rose-400">POST</span> /api/checks</div>
+   308→            <div className="text-slate-500 mt-3">{'{'}</div>
+   309→            <div className="pl-3">
+   310→              <span className="text-blue-400">{'"full_name"'}</span>: <span className="text-emerald-400">{'"Juan Pérez García"'}</span>,<br />
+   311→              <span className="text-blue-400">{'"curp"'}</span>: <span className="text-emerald-400">{'"PEGJ800101HDFRRN09"'}</span>,<br />
+   312→              <span className="text-blue-400">{'"rfc"'}</span>: <span className="text-emerald-400">{'"PEGJ800101AB1"'}</span>,<br />
+   313→              <span className="text-blue-400">{'"email"'}</span>: <span className="text-emerald-400">{'"juan@empresa.mx"'}</span>,<br />
+   314→              <span className="text-blue-400">{'"include_ai_report"'}</span>: <span className="text-amber-400">true</span>
+   315→            </div>
+   316→            <div className="text-slate-500">{'}'}</div>
+   317→            <div className="mt-3 pt-3 border-t border-slate-800 text-emerald-400">trust_score: 92 · risk_level: BAJO · recommendation: APPROVE</div>
+   318→          </div>
+   319→        </div>
+   320→      </section>
+   321→
+   322→      <footer className="py-8 bg-white border-t border-slate-200">
+   323→        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row gap-3 items-center justify-between text-xs text-slate-500">
+   324→          <div className="flex items-center gap-2">
+   325→            <ShieldCheck className="h-4 w-4" strokeWidth={1.75} />
+   326→            <span>© 2026 SynkData · Identity Intelligence Platform · México</span>
+   327→          </div>
+   328→        </div>
+   329→      </footer>
+   330→    </div>
+   331→  )
+   332→}
+   333→
+   334→// ==================== Login ====================
+   335→function LoginView() {
+   336→  const { login } = useAuth()
+   337→  const { navigate } = useRouter()
+   338→  const { toast } = useToast()
+   339→  const [email, setEmail] = useState('')
+   340→  const [password, setPassword] = useState('')
+   341→  const [loading, setLoading] = useState(false)
+   342→
+   343→  const handleLogin = async (e: React.FormEvent) => {
+   344→    e.preventDefault()
+   345→    setLoading(true)
+   346→    const data = await API.post('/api/auth/login', { email, password })
+   347→    if (data.token) {
+   348→      login(data.token, data.user)
+   349→      navigate('dashboard')
+   350→    } else {
+   351→      toast({ title: 'Error', description: data.error || 'Credenciales inválidas', variant: 'destructive' })
+   352→    }
+   353→    setLoading(false)
+   354→  }
+   355→
+   356→  return (
+   357→    <div className="min-h-screen flex">
+   358→      <div className="hidden lg:flex lg:w-1/2 bg-slate-950 text-white flex-col justify-center items-center p-12 relative overflow-hidden">
+   359→        <div className="absolute -top-32 -right-32 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl" />
+   360→        <div className="relative">
+   361→          <ShieldCheck className="h-16 w-16 mb-8" strokeWidth={1.5} />
+   362→          <h1 className="text-4xl font-extrabold tracking-tight mb-4">SynkData</h1>
+   363→          <p className="text-slate-400 max-w-sm leading-relaxed">Identity Intelligence Platform. Verificación de identidad, background checks y risk intelligence para México y LATAM.</p>
+   364→          <div className="mt-8 p-4 rounded-lg border border-slate-800 bg-slate-900/50 text-xs font-mono">
+   365→            <div className="text-slate-500 mb-2">Demo credentials:</div>
+   366→            <div>Admin: <span className="text-emerald-400">admin@synkdata.mx</span></div>
+   367→            <div>Analyst: <span className="text-emerald-400">analyst@synkdata.mx</span></div>
+   368→          </div>
+   369→        </div>
+   370→      </div>
+   371→      <div className="flex-1 flex items-center justify-center p-8">
+   372→        <div className="w-full max-w-md">
+   373→          <button onClick={() => navigate('landing')} className="flex items-center gap-2 mb-8 text-slate-500 hover:text-slate-950 text-sm">
+   374→            <ChevronLeft className="h-4 w-4" /> Volver al inicio
+   375→          </button>
+   376→          <h2 className="text-3xl font-bold text-slate-950 mb-2">Iniciar sesión</h2>
+   377→          <p className="text-slate-500 mb-8">Accede a la consola de Identity Intelligence.</p>
+   378→          <form onSubmit={handleLogin} className="space-y-4">
+   379→            <div>
+   380→              <label className="text-sm font-medium text-slate-700 mb-1 block">Email</label>
+   381→              <input type="email" value={email} onChange={e => setEmail(e.target.value)} required
+   382→                className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-950"
+   383→                placeholder="tu@email.com" />
+   384→            </div>
+   385→            <div>
+   386→              <label className="text-sm font-medium text-slate-700 mb-1 block">Password</label>
+   387→              <input type="password" value={password} onChange={e => setPassword(e.target.value)} required
+   388→                className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-950"
+   389→                placeholder="••••••••" />
+   390→            </div>
+   391→            <button type="submit" disabled={loading}
+   392→              className="w-full bg-slate-950 text-white py-2.5 rounded-md font-semibold text-sm hover:bg-slate-800 transition-colors disabled:opacity-50">
+   393→              {loading ? 'Verificando...' : 'Iniciar sesión'}
+   394→            </button>
+   395→          </form>
+   396→          <p className="text-sm text-slate-500 mt-6 text-center">
+   397→            ¿No tienes cuenta? <button onClick={() => navigate('register')} className="text-slate-950 font-semibold hover:underline">Crear cuenta</button>
+   398→          </p>
+   399→        </div>
+   400→      </div>
+   401→    </div>
+   402→  )
+   403→}
+   404→
+   405→// ==================== Register ====================
+   406→function RegisterView() {
+   407→  const { login } = useAuth()
+   408→  const { navigate } = useRouter()
+   409→  const { toast } = useToast()
+   410→  const [form, setForm] = useState({ email: '', password: '', fullName: '', organization: '' })
+   411→  const [loading, setLoading] = useState(false)
+   412→
+   413→  const handleRegister = async (e: React.FormEvent) => {
+   414→    e.preventDefault()
+   415→    setLoading(true)
+   416→    const data = await API.post('/api/auth/register', { ...form, role: 'analyst' })
+   417→    if (data.token) {
+   418→      login(data.token, data.user)
+   419→      navigate('dashboard')
+   420→    } else {
+   421→      toast({ title: 'Error', description: data.error || 'No se pudo crear la cuenta', variant: 'destructive' })
+   422→    }
+   423→    setLoading(false)
+   424→  }
+   425→
+   426→  return (
+   427→    <div className="min-h-screen flex">
+   428→      <div className="hidden lg:flex lg:w-1/2 bg-slate-950 text-white flex-col justify-center items-center p-12 relative overflow-hidden">
+   429→        <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-emerald-600/20 rounded-full blur-3xl" />
+   430→        <div className="relative">
+   431→          <ShieldCheck className="h-16 w-16 mb-8" strokeWidth={1.5} />
+   432→          <h1 className="text-4xl font-extrabold tracking-tight mb-4">Únete a SynkData</h1>
+   433→          <p className="text-slate-400 max-w-sm leading-relaxed">Accede a la plataforma de Identity Intelligence más completa para México y Latinoamérica.</p>
+   434→        </div>
+   435→      </div>
+   436→      <div className="flex-1 flex items-center justify-center p-8">
+   437→        <div className="w-full max-w-md">
+   438→          <button onClick={() => navigate('landing')} className="flex items-center gap-2 mb-8 text-slate-500 hover:text-slate-950 text-sm">
+   439→            <ChevronLeft className="h-4 w-4" /> Volver al inicio
+   440→          </button>
+   441→          <h2 className="text-3xl font-bold text-slate-950 mb-2">Crear cuenta</h2>
+   442→          <p className="text-slate-500 mb-8">Regístrate para acceder a la plataforma.</p>
+   443→          <form onSubmit={handleRegister} className="space-y-4">
+   444→            <div>
+   445→              <label className="text-sm font-medium text-slate-700 mb-1 block">Nombre completo</label>
+   446→              <input type="text" value={form.fullName} onChange={e => setForm(f => ({ ...f, fullName: e.target.value }))} required
+   447→                className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-950" />
+   448→            </div>
+   449→            <div>
+   450→              <label className="text-sm font-medium text-slate-700 mb-1 block">Email</label>
+   451→              <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} required
+   452→                className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-950" />
+   453→            </div>
+   454→            <div>
+   455→              <label className="text-sm font-medium text-slate-700 mb-1 block">Organización</label>
+   456→              <input type="text" value={form.organization} onChange={e => setForm(f => ({ ...f, organization: e.target.value }))}
+   457→                className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-950" />
+   458→            </div>
+   459→            <div>
+   460→              <label className="text-sm font-medium text-slate-700 mb-1 block">Password</label>
+   461→              <input type="password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} required
+   462→                className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-950" />
+   463→            </div>
+   464→            <button type="submit" disabled={loading}
+   465→              className="w-full bg-slate-950 text-white py-2.5 rounded-md font-semibold text-sm hover:bg-slate-800 transition-colors disabled:opacity-50">
+   466→              {loading ? 'Creando cuenta...' : 'Crear cuenta'}
+   467→            </button>
+   468→          </form>
+   469→          <p className="text-sm text-slate-500 mt-6 text-center">
+   470→            ¿Ya tienes cuenta? <button onClick={() => navigate('login')} className="text-slate-950 font-semibold hover:underline">Iniciar sesión</button>
+   471→          </p>
+   472→        </div>
+   473→      </div>
+   474→    </div>
+   475→  )
+   476→}
+   477→
+   478→// ==================== Dashboard Layout ====================
+   479→function DashboardLayout({ children }: { children: React.ReactNode }) {
+   480→  const { user, logout } = useAuth()
+   481→  const { navigate, view } = useRouter()
+   482→  const [mobileOpen, setMobileOpen] = useState(false)
+   483→
+   484→  const navItems: { key: View; label: string; icon: any }[] = [
+   485→    { key: 'dashboard', label: 'Dashboard', icon: BarChart3 },
+   486→    { key: 'new-check', label: 'Nuevo Check', icon: Plus },
+   487→    { key: 'history', label: 'Historial', icon: Search },
+   488→    { key: 'curp', label: 'Validador CURP', icon: IdCard },
+   489→    { key: 'rfc', label: 'Validador RFC', icon: Hash },
+   490→    { key: 'sanctions', label: 'Screening Sanciones', icon: Scale },
+   491→    { key: 'api-docs', label: 'API & Docs', icon: Plug },
+   492→  ]
+   493→
+   494→  return (
+   495→    <div className="min-h-screen flex bg-slate-50">
+   496→      {/* Sidebar */}
+   497→      <aside className={`fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-slate-200 transform transition-transform lg:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+   498→        <div className="h-16 flex items-center gap-2 px-6 border-b border-slate-200">
+   499→          <div className="h-8 w-8 bg-slate-950 text-white flex items-center justify-center rounded-md">
+   500→            <ShieldCheck className="h-5 w-5" strokeWidth={2} />
+   501→          </div>
+   502→          <span className="font-bold tracking-tight text-slate-950">SynkData</span>
+   503→        </div>
+   504→        <nav className="p-4 space-y-1">
+   505→          {navItems.map(item => (
+   506→            <button key={item.key} onClick={() => { navigate(item.key); setMobileOpen(false) }}
+   507→              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
+   508→                view === item.key ? 'bg-slate-100 text-slate-950' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-950'
+   509→              }`}>
+   510→              <item.icon className="h-4 w-4" strokeWidth={1.75} />
+   511→              {item.label}
+   512→            </button>
+   513→          ))}
+   514→        </nav>
+   515→        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-200">
+   516→          <div className="flex items-center gap-3 mb-3">
+   517→            <div className="h-8 w-8 bg-slate-200 rounded-full flex items-center justify-center">
+   518→              <User className="h-4 w-4 text-slate-600" />
+   519→            </div>
+   520→            <div className="flex-1 min-w-0">
+   521→              <div className="text-sm font-medium text-slate-950 truncate">{user?.full_name}</div>
+   522→              <div className="text-[10px] uppercase tracking-wider text-slate-400">{user?.role}</div>
+   523→            </div>
+   524→          </div>
+   525→          <button onClick={() => { logout(); navigate('landing') }}
+   526→            className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-950 transition-colors">
+   527→            <LogOut className="h-4 w-4" /> Cerrar sesión
+   528→          </button>
+   529→        </div>
+   530→      </aside>
+   531→
+   532→      {/* Main content */}
+   533→      <div className="flex-1 lg:ml-64">
+   534→        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 lg:px-8">
+   535→          <button onClick={() => setMobileOpen(true)} className="lg:hidden">
+   536→            <Menu className="h-5 w-5 text-slate-600" />
+   537→          </button>
+   538→          <div className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Identity Intelligence Platform</div>
+   539→          <div />
+   540→        </header>
+   541→        <main>{children}</main>
+   542→      </div>
+   543→
+   544→      {/* Mobile overlay */}
+   545→      {mobileOpen && <div className="fixed inset-0 z-30 bg-black/50 lg:hidden" onClick={() => setMobileOpen(false)} />}
+   546→    </div>
+   547→  )
+   548→}
+   549→
+   550→// ==================== Stat Card ====================
+   551→function StatCard({ icon: Icon, label, value, sub, accent }: { icon: any; label: string; value: any; sub?: string; accent?: string }) {
+   552→  return (
+   553→    <div className="p-5 bg-white border border-slate-200 rounded-lg">
+   554→      <div className={`h-9 w-9 flex items-center justify-center rounded-md mb-3 ${accent || 'bg-slate-100 text-slate-950'}`}>
+   555→        <Icon className="h-4 w-4" strokeWidth={1.75} />
+   556→      </div>
+   557→      <div className="text-3xl font-extrabold tracking-tighter text-slate-950">{value}</div>
+   558→      <div className="text-xs uppercase tracking-wider text-slate-500 font-semibold mt-1">{label}</div>
+   559→      {sub && <div className="text-xs text-slate-400 mt-2">{sub}</div>}
+   560→    </div>
+   561→  )
+   562→}
+   563→
+   564→// ==================== Dashboard View ====================
+   565→function DashboardView() {
+   566→  const { user, token } = useAuth()
+   567→  const { navigate } = useRouter()
+   568→  const [data, setData] = useState<any>(null)
+   569→  const [loading, setLoading] = useState(true)
+   570→
+   571→  useEffect(() => {
+   572→    if (token) {
+   573→      API.get('/api/analytics/dashboard', token).then(d => { setData(d); setLoading(false) })
+   574→    } else {
+   575→      setLoading(false)
+   576→    }
+   577→    // eslint-disable-next-line react-hooks/set-state-in-effect
+   578→  }, [token])
+   579→
+   580→  if (loading) return <div className="p-8"><div className="animate-pulse space-y-4"><div className="h-8 bg-slate-200 rounded w-64" /><div className="grid grid-cols-4 gap-5">{[1,2,3,4].map(i => <div key={i} className="h-32 bg-slate-200 rounded-lg" />)}</div></div></div>
+   581→
+   582→  const riskData = Object.entries(data?.risk_distribution || {}).map(([level, count]: any) => ({ level, count, fill: RISK_COLORS[level] }))
+   583→  const recData = Object.entries(data?.recommendation_distribution || {}).map(([rec, count]: any) => ({ name: REC_LABEL[rec] || rec, value: count, fill: REC_COLORS[rec] }))
+   584→
+   585→  return (
+   586→    <div className="p-6 lg:p-8 space-y-6">
+   587→      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+   588→        <div>
+   589→          <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-600 mb-1.5">Dashboard ejecutivo</div>
+   590→          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tighter text-slate-950">
+   591→            Bienvenido, {user?.full_name?.split(' ')[0]}
+   592→          </h1>
+   593→          <p className="text-sm text-slate-500 mt-1">Identity Intelligence en tiempo real</p>
+   594→        </div>
+   595→        <button onClick={() => navigate('new-check')}
+   596→          className="inline-flex items-center gap-2 bg-slate-950 text-white px-5 py-2.5 rounded-md font-semibold text-sm hover:-translate-y-0.5 transition-transform">
+   597→          <FileSearch className="h-4 w-4" /> Nuevo Background Check <ArrowRight className="h-4 w-4" />
+   598→        </button>
+   599→      </div>
+   600→
+   601→      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+   602→        <StatCard icon={FileSearch} label="Checks procesados" value={data?.total_checks ?? 0} sub="Histórico total" accent="bg-slate-100 text-slate-950" />
+   603→        <StatCard icon={CheckCircle2} label="Trust Score promedio" value={data?.average_trust_score ?? 0} sub="Promedio" accent="bg-emerald-100 text-emerald-700" />
+   604→        <StatCard icon={ShieldAlert} label="Risk Score promedio" value={data?.average_risk_score ?? 0} sub="Promedio" accent="bg-amber-100 text-amber-700" />
+   605→        <StatCard icon={Scale} label="Coincidencias sanciones" value={data?.sanctions_matches ?? 0} sub={`PEP: ${data?.pep_matches ?? 0}`} accent="bg-rose-100 text-rose-700" />
+   606→      </div>
+   607→
+   608→      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+   609→        <div className="lg:col-span-2 p-5 bg-white border border-slate-200 rounded-lg">
+   610→          <div className="flex items-center justify-between mb-4">
+   611→            <div>
+   612→              <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Distribución</div>
+   613→              <h3 className="font-bold text-slate-950">Niveles de riesgo</h3>
+   614→            </div>
+   615→            <TrendingUp className="h-4 w-4 text-slate-400" />
+   616→          </div>
+   617→          <ResponsiveContainer width="100%" height={240}>
+   618→            <BarChart data={riskData}>
+   619→              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+   620→              <XAxis dataKey="level" stroke="#64748b" fontSize={11} />
+   621→              <YAxis stroke="#64748b" fontSize={11} allowDecimals={false} />
+   622→              <Tooltip contentStyle={{ background: '#0f172a', border: 'none', borderRadius: 6, color: 'white', fontSize: 12 }} />
+   623→              <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+   624→                {riskData.map((entry, index) => <Cell key={index} fill={entry.fill} />)}
+   625→              </Bar>
+   626→            </BarChart>
+   627→          </ResponsiveContainer>
+   628→        </div>
+   629→
+   630→        <div className="p-5 bg-white border border-slate-200 rounded-lg">
+   631→          <div className="mb-4">
+   632→            <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Recomendaciones</div>
+   633→            <h3 className="font-bold text-slate-950">Veredicto</h3>
+   634→          </div>
+   635→          <ResponsiveContainer width="100%" height={240}>
+   636→            <PieChart>
+   637→              <Pie data={recData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={45} outerRadius={75} paddingAngle={2}>
+   638→                {recData.map((entry, index) => <Cell key={index} fill={entry.fill} />)}
+   639→              </Pie>
+   640→              <Tooltip contentStyle={{ background: '#0f172a', border: 'none', borderRadius: 6, color: 'white', fontSize: 12 }} />
+   641→              <Legend wrapperStyle={{ fontSize: 11 }} />
+   642→            </PieChart>
+   643→          </ResponsiveContainer>
+   644→        </div>
+   645→      </div>
+   646→
+   647→      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+   648→        <div className="lg:col-span-2 p-5 bg-white border border-slate-200 rounded-lg">
+   649→          <div className="mb-4">
+   650→            <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Tendencia</div>
+   651→            <h3 className="font-bold text-slate-950">Checks últimos 14 días</h3>
+   652→          </div>
+   653→          <ResponsiveContainer width="100%" height={220}>
+   654→            <LineChart data={data?.trend_14_days || []}>
+   655→              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+   656→              <XAxis dataKey="date" stroke="#64748b" fontSize={10} />
+   657→              <YAxis stroke="#64748b" fontSize={11} allowDecimals={false} />
+   658→              <Tooltip contentStyle={{ background: '#0f172a', border: 'none', borderRadius: 6, color: 'white', fontSize: 12 }} />
+   659→              <Line type="monotone" dataKey="count" stroke="#0f172a" strokeWidth={2} dot={{ fill: '#0f172a', r: 3 }} />
+   660→            </LineChart>
+   661→          </ResponsiveContainer>
+   662→        </div>
+   663→
+   664→        <div className="p-5 bg-white border border-slate-200 rounded-lg">
+   665→          <h3 className="font-bold text-slate-950 mb-1">Checks recientes</h3>
+   666→          <div className="text-[10px] uppercase tracking-wider text-slate-400 mb-3">Últimas verificaciones</div>
+   667→          <div className="space-y-2 max-h-[260px] overflow-y-auto">
+   668→            {(data?.recent_checks || []).map((c: any) => (
+   669→              <button key={c.id} onClick={() => navigate('check-results', { checkId: c.id })}
+   670→                className="flex items-center gap-3 p-2.5 w-full text-left rounded-md hover:bg-slate-50 transition-colors">
+   671→                <div className={`w-1 h-9 rounded-full ${c.risk_level === 'BAJO' ? 'bg-emerald-500' : c.risk_level === 'MEDIO' ? 'bg-amber-500' : c.risk_level === 'ALTO' ? 'bg-rose-500' : 'bg-rose-700'}`} />
+   672→                <div className="flex-1 min-w-0">
+   673→                  <div className="text-sm font-medium text-slate-950 truncate">{c.subject?.full_name}</div>
+   674→                  <div className="text-[10px] text-slate-500 font-mono">{(c.created_at || '').slice(0, 16).replace('T', ' ')}</div>
+   675→                </div>
+   676→                <div className="flex items-center gap-2">
+   677→                  <div className="text-xs font-bold text-slate-950">{c.trust_score}</div>
+   678→                  {c.recommendation === 'APPROVE' ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> :
+   679→                   c.recommendation === 'REVIEW' ? <Eye className="h-4 w-4 text-amber-500" /> :
+   680→                   <XCircle className="h-4 w-4 text-rose-500" />}
+   681→                </div>
+   682→              </button>
+   683→            ))}
+   684→            {(!data?.recent_checks || data.recent_checks.length === 0) && (
+   685→              <div className="text-sm text-slate-400 text-center py-6 flex flex-col items-center gap-2">
+   686→                <AlertTriangle className="h-5 w-5" />
+   687→                <span>Aún no hay checks. Crea el primero.</span>
+   688→              </div>
+   689→            )}
+   690→          </div>
+   691→        </div>
+   692→      </div>
+   693→    </div>
+   694→  )
+   695→}
+   696→
+   697→// ==================== New Check Wizard ====================
+   698→function NewCheckView() {
+   699→  const token = useToken()
+   700→  const { navigate } = useRouter()
+   701→  const { toast } = useToast()
+   702→  const [step, setStep] = useState(0)
+   703→  const [loading, setLoading] = useState(false)
+   704→  const [form, setForm] = useState({
+   705→    full_name: '', curp: '', rfc: '', email: '', phone: '', username: '', address: '',
+   706→    include_government: true, include_sanctions: true, include_digital: true,
+   707→    include_relationship: true, include_ai_report: true,
+   708→  })
+   709→
+   710→  const steps = ['Personal', 'Identidad', 'Digital', 'Módulos']
+   711→  const stepIcons = [User, IdCard, Globe2, Zap]
+   712→
+   713→  const handleSubmit = async () => {
+   714→    if (!form.full_name.trim()) { toast({ title: 'Error', description: 'Nombre completo es requerido', variant: 'destructive' }); return }
+   715→    setLoading(true)
+   716→    const data = await API.post('/api/checks', form, token)
+   717→    if (data.id) {
+   718→      toast({ title: 'Check completado', description: `Trust: ${data.trust_score} | Risk: ${data.risk_score} | ${data.recommendation}` })
+   719→      navigate('check-results', { checkId: data.id, checkData: data })
+   720→    } else {
+   721→      toast({ title: 'Error', description: data.error || 'No se pudo crear el check', variant: 'destructive' })
+   722→    }
+   723→    setLoading(false)
+   724→  }
+   725→
+   726→  return (
+   727→    <div className="p-6 lg:p-8 max-w-4xl mx-auto">
+   728→      <div className="mb-8">
+   729→        <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-600 mb-1.5">Background Check</div>
+   730→        <h1 className="text-3xl font-extrabold tracking-tighter text-slate-950">Nueva verificación</h1>
+   731→        <p className="text-sm text-slate-500 mt-1">Completa los datos del sujeto para el análisis de identidad.</p>
+   732→      </div>
+   733→
+   734→      {/* Step indicator */}
+   735→      <div className="flex items-center gap-2 mb-8">
+   736→        {steps.map((s, i) => (
+   737→          <React.Fragment key={s}>
+   738→            <button onClick={() => i < step && setStep(i)}
+   739→              className={`flex items-center gap-2 px-3 py-2 rounded-md text-xs font-semibold transition-colors ${
+   740→                i === step ? 'bg-slate-950 text-white' : i < step ? 'bg-emerald-100 text-emerald-700 cursor-pointer' : 'bg-slate-100 text-slate-400'
+   741→              }`}>
+   742→              {React.createElement(stepIcons[i], { className: 'h-3.5 w-3.5' })}
+   743→              {s}
+   744→            </button>
+   745→            {i < steps.length - 1 && <div className="w-8 h-px bg-slate-200" />}
+   746→          </React.Fragment>
+   747→        ))}
+   748→      </div>
+   749→
+   750→      {/* Step 0: Personal */}
+   751→      {step === 0 && (
+   752→        <div className="space-y-4 bg-white p-6 rounded-lg border border-slate-200">
+   753→          <h2 className="font-bold text-slate-950 text-lg mb-4">Datos personales</h2>
+   754→          <div>
+   755→            <label className="text-sm font-medium text-slate-700 mb-1 block">Nombre completo *</label>
+   756→            <input value={form.full_name} onChange={e => setForm(f => ({ ...f, full_name: e.target.value }))}
+   757→              className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-950"
+   758→              placeholder="Juan Pérez García" />
+   759→          </div>
+   760→          <div>
+   761→            <label className="text-sm font-medium text-slate-700 mb-1 block">Dirección</label>
+   762→            <input value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))}
+   763→              className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-950"
+   764→              placeholder="Ciudad de México, CDMX" />
+   765→          </div>
+   766→        </div>
+   767→      )}
+   768→
+   769→      {/* Step 1: Identity */}
+   770→      {step === 1 && (
+   771→        <div className="space-y-4 bg-white p-6 rounded-lg border border-slate-200">
+   772→          <h2 className="font-bold text-slate-950 text-lg mb-4">Datos de identidad</h2>
+   773→          <div>
+   774→            <label className="text-sm font-medium text-slate-700 mb-1 block">CURP</label>
+   775→            <input value={form.curp} onChange={e => setForm(f => ({ ...f, curp: e.target.value.toUpperCase() }))} maxLength={18}
+   776→              className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-950"
+   777→              placeholder="PEGJ800101HDFRRN09" />
+   778→            <p className="text-[10px] text-slate-400 mt-1">18 caracteres · Algoritmo de verificación oficial</p>
+   779→          </div>
+   780→          <div>
+   781→            <label className="text-sm font-medium text-slate-700 mb-1 block">RFC</label>
+   782→            <input value={form.rfc} onChange={e => setForm(f => ({ ...f, rfc: e.target.value.toUpperCase() }))} maxLength={13}
+   783→              className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-950"
+   784→              placeholder="PEGJ800101AB1" />
+   785→            <p className="text-[10px] text-slate-400 mt-1">12 (moral) o 13 (física) caracteres</p>
+   786→          </div>
+   787→        </div>
+   788→      )}
+   789→
+   790→      {/* Step 2: Digital */}
+   791→      {step === 2 && (
+   792→        <div className="space-y-4 bg-white p-6 rounded-lg border border-slate-200">
+   793→          <h2 className="font-bold text-slate-950 text-lg mb-4">Identidad digital</h2>
+   794→          <div>
+   795→            <label className="text-sm font-medium text-slate-700 mb-1 block">Email</label>
+   796→            <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+   797→              className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-950"
+   798→              placeholder="juan@empresa.mx" />
+   799→          </div>
+   800→          <div>
+   801→            <label className="text-sm font-medium text-slate-700 mb-1 block">Teléfono</label>
+   802→            <input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+   803→              className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-950"
+   804→              placeholder="+52 55 1234 5678" />
+   805→          </div>
+   806→          <div>
+   807→            <label className="text-sm font-medium text-slate-700 mb-1 block">Username / Alias</label>
+   808→            <input value={form.username} onChange={e => setForm(f => ({ ...f, username: e.target.value }))}
+   809→              className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-950"
+   810→              placeholder="snupdrack" />
+   811→          </div>
+   812→        </div>
+   813→      )}
+   814→
+   815→      {/* Step 3: Modules */}
+   816→      {step === 3 && (
+   817→        <div className="space-y-4 bg-white p-6 rounded-lg border border-slate-200">
+   818→          <h2 className="font-bold text-slate-950 text-lg mb-4">Módulos de análisis</h2>
+   819→          <p className="text-sm text-slate-500 mb-4">Selecciona qué módulos incluir en la verificación.</p>
+   820→          {[
+   821→            { key: 'include_government', label: 'Government Intelligence', desc: 'RENAPO, SAT, IMSS, RND', icon: ShieldCheck },
+   822→            { key: 'include_sanctions', label: 'Compliance Intelligence', desc: 'OFAC, ONU, PEP, SAT 69-B, Interpol', icon: Scale },
+   823→            { key: 'include_digital', label: 'Digital Identity & Footprint', desc: 'Email, teléfono, username, redes sociales', icon: Globe2 },
+   824→            { key: 'include_relationship', label: 'Relationship Intelligence', desc: 'Knowledge graph y detección de patrones', icon: Network },
+   825→            { key: 'include_ai_report', label: 'AI Investigation Report', desc: 'Reporte automático de investigación', icon: Brain },
+   826→          ].map(m => (
+   827→            <label key={m.key} className={`flex items-center gap-4 p-4 rounded-md border cursor-pointer transition-colors ${
+   828→              (form as any)[m.key] ? 'border-slate-950 bg-slate-50' : 'border-slate-200'
+   829→            }`}>
+   830→              <input type="checkbox" checked={(form as any)[m.key]}
+   831→                onChange={e => setForm(f => ({ ...f, [m.key]: e.target.checked }))}
+   832→                className="h-4 w-4 rounded border-slate-300" />
+   833→              <m.icon className="h-5 w-5 text-slate-600" strokeWidth={1.75} />
+   834→              <div>
+   835→                <div className="text-sm font-semibold text-slate-950">{m.label}</div>
+   836→                <div className="text-xs text-slate-500">{m.desc}</div>
+   837→              </div>
+   838→            </label>
+   839→          ))}
+   840→        </div>
+   841→      )}
+   842→
+   843→      {/* Navigation buttons */}
+   844→      <div className="flex items-center justify-between mt-6">
+   845→        <button onClick={() => step > 0 ? setStep(step - 1) : navigate('dashboard')}
+   846→          className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-950">
+   847→          <ChevronLeft className="h-4 w-4" /> {step > 0 ? 'Anterior' : 'Cancelar'}
+   848→        </button>
+   849→        {step < 3 ? (
+   850→          <button onClick={() => setStep(step + 1)} disabled={!form.full_name.trim()}
+   851→            className="flex items-center gap-2 bg-slate-950 text-white px-5 py-2.5 rounded-md font-semibold text-sm hover:bg-slate-800 disabled:opacity-50">
+   852→            Siguiente <ChevronRight className="h-4 w-4" />
+   853→          </button>
+   854→        ) : (
+   855→          <button onClick={handleSubmit} disabled={loading}
+   856→            className="flex items-center gap-2 bg-slate-950 text-white px-5 py-2.5 rounded-md font-semibold text-sm hover:bg-slate-800 disabled:opacity-50">
+   857→            {loading ? (
+   858→              <><RefreshCw className="h-4 w-4 animate-spin" /> Procesando...</>
+   859→            ) : (
+   860→              <><Zap className="h-4 w-4" /> Ejecutar verificación</>
+   861→            )}
+   862→          </button>
+   863→        )}
+   864→      </div>
+   865→    </div>
+   866→  )
+   867→}
+   868→
+   869→// ==================== Score Gauge ====================
+   870→function ScoreGauge({ value, label, color }: { value: number; label: string; color: string }) {
+   871→  const data = [{ name: label, value, fill: color }]
+   872→  return (
+   873→    <div className="text-center">
+   874→      <ResponsiveContainer width={140} height={80}>
+   875→        <RadialBarChart innerRadius="70%" outerRadius="100%" data={data} startAngle={180} endAngle={0}>
+   876→          <RadialBar dataKey="value" cornerRadius={10} fill={color} background={{ fill: '#f1f5f9' }} />
+   877→        </RadialBarChart>
+   878→      </ResponsiveContainer>
+   879→      <div className="text-2xl font-extrabold tracking-tighter" style={{ color }}>{value}</div>
+   880→      <div className="text-[10px] uppercase tracking-wider text-slate-400">{label}</div>
+   881→    </div>
+   882→  )
+   883→}
+   884→
+   885→// ==================== Check Results ====================
+   886→function CheckResultsView() {
+   887→  const token = useToken()
+   888→  const { navigate } = useRouter()
+   889→  const { viewData } = useRouter()
+   890→  const [check, setCheck] = useState<any>(viewData?.checkData || null)
+   891→  const [loading, setLoading] = useState(!check)
+   892→
+   893→  useEffect(() => {
+   894→    if (!check && viewData?.checkId && token) {
+   895→      API.get(`/api/checks/${viewData.checkId}`, token).then(d => { setCheck(d); setLoading(false) })
+   896→    }
+   897→  }, [check, viewData, token])
+   898→
+   899→  if (loading) return <div className="p-8 animate-pulse space-y-4"><div className="h-8 bg-slate-200 rounded w-96" /><div className="h-64 bg-slate-200 rounded-lg" /></div>
+   900→  if (!check) return <div className="p-8"><p className="text-slate-500">No se encontró el check.</p></div>
+   901→
+   902→  const riskColor = RISK_COLORS[check.risk_level] || '#64748b'
+   903→
+   904→  return (
+   905→    <div className="p-6 lg:p-8 space-y-6 max-w-6xl mx-auto">
+   906→      {/* Header */}
+   907→      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+   908→        <div>
+   909→          <button onClick={() => navigate('history')} className="text-sm text-slate-500 hover:text-slate-950 flex items-center gap-1 mb-2">
+   910→            <ChevronLeft className="h-4 w-4" /> Historial
+   911→          </button>
+   912→          <h1 className="text-3xl font-extrabold tracking-tighter text-slate-950">{check.subject?.full_name}</h1>
+   913→          <div className="flex items-center gap-3 mt-2">
+   914→            <div className="px-2 py-0.5 rounded text-xs font-bold text-white" style={{ backgroundColor: riskColor }}>{check.risk_level}</div>
+   915→            <div className="text-sm text-slate-500">Recomendación: {check.recommendation}</div>
+   916→          </div>
+   917→        </div>
+   918→        <div className="text-xs text-slate-400 font-mono">{check.created_at?.slice(0, 19).replace('T', ' ')}</div>
+   919→      </div>
+   920→
+   921→      {/* Scores */}
+   922→      <div className="grid grid-cols-3 gap-4 bg-white p-6 rounded-lg border border-slate-200">
+   923→        <ScoreGauge value={check.trust_score} label="Trust Score" color="#10b981" />
+   924→        <ScoreGauge value={check.risk_score} label="Risk Score" color={riskColor} />
+   925→        <ScoreGauge value={check.identity_confidence} label="Confianza" color="#6366f1" />
+   926→      </div>
+   927→
+   928→      {/* Flags */}
+   929→      {check.flags?.length > 0 && (
+   930→        <div className="p-4 rounded-lg border border-rose-200 bg-rose-50">
+   931→          <div className="flex items-center gap-2 text-rose-700 font-semibold text-sm mb-2"><AlertTriangle className="h-4 w-4" /> Alertas</div>
+   932→          {check.flags.map((f: string, i: number) => (
+   933→            <div key={i} className="text-sm text-rose-600 flex items-center gap-2"><Flag className="h-3 w-3" />{f}</div>
+   934→          ))}
+   935→        </div>
+   936→      )}
+   937→
+   938→      {/* Module results in tabs-like layout */}
+   939→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+   940→        {/* CURP */}
+   941→        {check.curp_validation && (
+   942→          <div className="p-5 bg-white border border-slate-200 rounded-lg">
+   943→            <div className="flex items-center gap-2 mb-3">
+   944→              <IdCard className="h-4 w-4 text-slate-600" strokeWidth={1.75} />
+   945→              <h3 className="font-bold text-slate-950">CURP</h3>
+   946→              {check.curp_validation.is_valid ?
+   947→                <CheckCircle2 className="h-4 w-4 text-emerald-500" /> :
+   948→                <XCircle className="h-4 w-4 text-rose-500" />}
+   949→            </div>
+   950→            <div className="text-sm font-mono bg-slate-50 p-3 rounded mb-3">{check.curp_validation.curp}</div>
+   951→            <div className="text-sm text-slate-600">{check.curp_validation.message}</div>
+   952→            {check.curp_validation.components && (
+   953→              <div className="mt-3 space-y-1 text-xs">
+   954→                <div className="flex justify-between"><span className="text-slate-400">Fecha nacimiento</span><span className="text-slate-950 font-medium">{check.curp_validation.components.birth_date}</span></div>
+   955→                <div className="flex justify-between"><span className="text-slate-400">Sexo</span><span className="text-slate-950 font-medium">{check.curp_validation.components.sex}</span></div>
+   956→                <div className="flex justify-between"><span className="text-slate-400">Estado</span><span className="text-slate-950 font-medium">{check.curp_validation.components.state}</span></div>
+   957→                <div className="flex justify-between"><span className="text-slate-400">Dígito verificador</span><span className="text-slate-950 font-medium">{check.curp_validation.check_digit_valid ? '✓ Válido' : '✗ Inválido'}</span></div>
+   958→              </div>
+   959→            )}
+   960→          </div>
+   961→        )}
+   962→
+   963→        {/* RFC */}
+   964→        {check.rfc_validation && (
+   965→          <div className="p-5 bg-white border border-slate-200 rounded-lg">
+   966→            <div className="flex items-center gap-2 mb-3">
+   967→              <Hash className="h-4 w-4 text-slate-600" strokeWidth={1.75} />
+   968→              <h3 className="font-bold text-slate-950">RFC</h3>
+   969→              {check.rfc_validation.is_valid ?
+   970→                <CheckCircle2 className="h-4 w-4 text-emerald-500" /> :
+   971→                <XCircle className="h-4 w-4 text-rose-500" />}
+   972→            </div>
+   973→            <div className="text-sm font-mono bg-slate-50 p-3 rounded mb-3">{check.rfc_validation.rfc}</div>
+   974→            <div className="text-sm text-slate-600">{check.rfc_validation.message}</div>
+   975→            {check.rfc_validation.components && (
+   976→              <div className="mt-3 space-y-1 text-xs">
+   977→                <div className="flex justify-between"><span className="text-slate-400">Tipo</span><span className="text-slate-950 font-medium">{check.rfc_validation.type === 'fisica' ? 'Persona Física' : 'Persona Moral'}</span></div>
+   978→                <div className="flex justify-between"><span className="text-slate-400">SAT Status</span><span className={`font-medium ${check.rfc_validation.sat_status === 'ACTIVO' ? 'text-emerald-600' : 'text-rose-600'}`}>{check.rfc_validation.sat_status}</span></div>
+   979→                <div className="flex justify-between"><span className="text-slate-400">Régimen</span><span className="text-slate-950 font-medium">{check.rfc_validation.regimen_fiscal}</span></div>
+   980→              </div>
+   981→            )}
+   982→          </div>
+   983→        )}
+   984→
+   985→        {/* Government */}
+   986→        {check.government && (
+   987→          <div className="p-5 bg-white border border-slate-200 rounded-lg">
+   988→            <div className="flex items-center gap-2 mb-3">
+   989→              <ShieldCheck className="h-4 w-4 text-slate-600" strokeWidth={1.75} />
+   990→              <h3 className="font-bold text-slate-950">Government Intelligence</h3>
+   991→            </div>
+   992→            <div className="space-y-3">
+   993→              {check.government.renapo && (
+   994→                <div className="p-3 bg-slate-50 rounded">
+   995→                  <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">RENAPO</div>
+   996→                  <div className="text-sm">{check.government.renapo.found ? <span className="text-emerald-600 font-medium">Registro vigente</span> : <span className="text-slate-500">No encontrado</span>}</div>
+   997→                </div>
+   998→              )}
+   999→              {check.government.sat && (
+  1000→                <div className="p-3 bg-slate-50 rounded">
+  1001→                  <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">SAT</div>
+  1002→                  <div className="text-sm">Status: <span className={check.government.sat.status === 'ACTIVO' ? 'text-emerald-600' : 'text-rose-600'}>{check.government.sat.status}</span></div>
+  1003→                </div>
+  1004→              )}
+  1005→              {check.government.rnd && (
+  1006→                <div className="p-3 bg-slate-50 rounded">
+  1007→                  <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">RND (Detenciones)</div>
+  1008→                  <div className="text-sm">{check.government.rnd.sin_resultados ? <span className="text-emerald-600">Sin registros</span> : <span className="text-rose-600 font-medium">Registro encontrado</span>}</div>
+  1009→                </div>
+  1010→              )}
+  1011→            </div>
+  1012→          </div>
+  1013→        )}
+  1014→
+  1015→        {/* Sanctions */}
+  1016→        {check.sanctions && (
+  1017→          <div className="p-5 bg-white border border-slate-200 rounded-lg">
+  1018→            <div className="flex items-center gap-2 mb-3">
+  1019→              <Scale className="h-4 w-4 text-slate-600" strokeWidth={1.75} />
+  1020→              <h3 className="font-bold text-slate-950">Compliance Intelligence</h3>
+  1021→              {check.sanctions.is_sanctioned ?
+  1022→                <XCircle className="h-4 w-4 text-rose-500" /> :
+  1023→                check.sanctions.is_pep ? <AlertTriangle className="h-4 w-4 text-amber-500" /> :
+  1024→                <CheckCircle2 className="h-4 w-4 text-emerald-500" />}
+  1025→            </div>
+  1026→            <div className="text-sm mb-3">
+  1027→              {check.sanctions.is_sanctioned ? <span className="text-rose-600 font-semibold">Match en listas de sanciones</span> :
+  1028→               check.sanctions.is_pep ? <span className="text-amber-600 font-semibold">Persona Expuesta Políticamente (PEP)</span> :
+  1029→               <span className="text-emerald-600 font-semibold">Sin coincidencias en listas restringidas</span>}
+  1030→            </div>
+  1031→            {check.sanctions.matches?.length > 0 && (
+  1032→              <div className="space-y-2">
+  1033→                {check.sanctions.matches.map((m: any, i: number) => (
+  1034→                  <div key={i} className="p-2 rounded border border-slate-200 text-xs">
+  1035→                    <div className="flex items-center justify-between">
+  1036→                      <span className="font-semibold text-slate-950">{m.matched_name}</span>
+  1037→                      <span className="text-slate-400">{m.score}%</span>
+  1038→                    </div>
+  1039→                    <div className="text-slate-500">{m.list_name} · {m.type} · {m.country}</div>
+  1040→                  </div>
+  1041→                ))}
+  1042→              </div>
+  1043→            )}
+  1044→            <div className="text-[10px] text-slate-400 mt-3">{check.sanctions.lists_checked?.length || 0} listas consultadas · {check.sanctions.total_records_screened} registros</div>
+  1045→          </div>
+  1046→        )}
+  1047→
+  1048→        {/* Digital Identity */}
+  1049→        {check.digital_identity && (
+  1050→          <div className="p-5 bg-white border border-slate-200 rounded-lg">
+  1051→            <div className="flex items-center gap-2 mb-3">
+  1052→              <Globe2 className="h-4 w-4 text-slate-600" strokeWidth={1.75} />
+  1053→              <h3 className="font-bold text-slate-950">Digital Identity Intelligence</h3>
+  1054→            </div>
+  1055→            <div className="space-y-3">
+  1056→              {check.digital_identity.email && (
+  1057→                <div className="p-3 bg-slate-50 rounded">
+  1058→                  <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Email</div>
+  1059→                  <div className="text-sm font-mono">{check.digital_identity.email.email}</div>
+  1060→                  <div className="text-xs text-slate-500 mt-1">
+  1061→                    {check.digital_identity.email.is_disposable ? <span className="text-rose-600 font-semibold">DESECHEABLE</span> :
+  1062→                     check.digital_identity.email.is_corporate_business ? <span className="text-emerald-600">Corporativo</span> : 'Personal'}
+  1063→                    {' · '}{check.digital_identity.email.breach_count} brechas
+  1064→                  </div>
+  1065→                </div>
+  1066→              )}
+  1067→              {check.digital_identity.phone && (
+  1068→                <div className="p-3 bg-slate-50 rounded">
+  1069→                  <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Teléfono</div>
+  1070→                  <div className="text-sm">{check.digital_identity.phone.carrier} · {check.digital_identity.phone.line_type}</div>
+  1071→                  {check.digital_identity.phone.is_spam_reported && <div className="text-xs text-rose-600 font-semibold">Reportado como spam</div>}
+  1072→                </div>
+  1073→              )}
+  1074→              {check.digital_identity.username?.found && (
+  1075→                <div className="p-3 bg-slate-50 rounded">
+  1076→                  <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Username: {check.digital_identity.username.username}</div>
+  1077→                  <div className="text-sm">{check.digital_identity.username.profile_count} perfiles encontrados</div>
+  1078→                  <div className="flex flex-wrap gap-1 mt-2">
+  1079→                    {check.digital_identity.username.profiles?.slice(0, 6).map((p: any) => (
+  1080→                      <span key={p.platform} className="px-2 py-0.5 bg-white border border-slate-200 rounded text-[10px] font-mono text-slate-600">{p.platform}</span>
+  1081→                    ))}
+  1082→                  </div>
+  1083→                </div>
+  1084→              )}
+  1085→            </div>
+  1086→          </div>
+  1087→        )}
+  1088→
+  1089→        {/* Digital Footprint */}
+  1090→        {check.digital_footprint && (
+  1091→          <div className="p-5 bg-white border border-slate-200 rounded-lg">
+  1092→            <div className="flex items-center gap-2 mb-3">
+  1093→              <Eye className="h-4 w-4 text-slate-600" strokeWidth={1.75} />
+  1094→              <h3 className="font-bold text-slate-950">Digital Footprint</h3>
+  1095→            </div>
+  1096→            <div className="flex items-center gap-4 mb-4">
+  1097→              <div className="text-4xl font-extrabold tracking-tighter text-slate-950">{check.digital_footprint.presence_score}</div>
+  1098→              <div>
+  1099→                <div className="text-xs uppercase tracking-wider text-slate-400">Presencia digital</div>
+  1100→                <div className="text-sm text-slate-600">{check.digital_footprint.social_profiles_count} social · {check.digital_footprint.developer_profiles_count} dev</div>
+  1101→              </div>
+  1102→            </div>
+  1103→            {check.digital_footprint.professional_presence && (
+  1104→              <div className="text-xs text-emerald-600 font-semibold flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Presencia profesional detectada</div>
+  1105→            )}
+  1106→          </div>
+  1107→        )}
+  1108→      </div>
+  1109→
+  1110→      {/* Relationship Graph (simplified visual) */}
+  1111→      {check.relationship_graph && (
+  1112→        <div className="p-5 bg-white border border-slate-200 rounded-lg">
+  1113→          <div className="flex items-center gap-2 mb-4">
+  1114→            <Network className="h-4 w-4 text-slate-600" strokeWidth={1.75} />
+  1115→            <h3 className="font-bold text-slate-950">Relationship Intelligence</h3>
+  1116→            <span className="text-xs text-slate-400 ml-2">{check.relationship_graph.analysis?.total_nodes} nodos · {check.relationship_graph.analysis?.total_edges} conexiones</span>
+  1117→          </div>
+  1118→          {check.relationship_graph.analysis?.suspicious_patterns?.length > 0 && (
+  1119→            <div className="p-3 rounded border border-rose-200 bg-rose-50 mb-4">
+  1120→              {check.relationship_graph.analysis.suspicious_patterns.map((p: any, i: number) => (
+  1121→                <div key={i} className="text-sm text-rose-700 flex items-center gap-2"><AlertTriangle className="h-4 w-4" />{p.description}</div>
+  1122→              ))}
+  1123→            </div>
+  1124→          )}
+  1125→          <div className="flex flex-wrap gap-2">
+  1126→            {check.relationship_graph.graph?.nodes?.map((n: any) => (
+  1127→              <div key={n.data.id}
+  1128→                className={`px-3 py-2 rounded-md border text-xs font-medium ${
+  1129→                  n.data.type === 'Person' ? 'bg-slate-100 border-slate-300 text-slate-950' :
+  1130→                  n.data.type === 'Email' ? 'bg-blue-50 border-blue-200 text-blue-700' :
+  1131→                  n.data.type === 'Phone' ? 'bg-cyan-50 border-cyan-200 text-cyan-700' :
+  1132→                  n.data.type === 'Curp' ? 'bg-purple-50 border-purple-200 text-purple-700' :
+  1133→                  n.data.type === 'Rfc' ? 'bg-violet-50 border-violet-200 text-violet-700' :
+  1134→                  n.data.type === 'SanctionMatch' ? 'bg-rose-50 border-rose-200 text-rose-700' :
+  1135→                  n.data.type === 'SocialProfile' ? 'bg-gray-50 border-gray-200 text-gray-700' :
+  1136→                  'bg-slate-50 border-slate-200 text-slate-600'
+  1137→                }`}>
+  1138→                {n.data.label}
+  1139→              </div>
+  1140→            ))}
+  1141→          </div>
+  1142→        </div>
+  1143→      )}
+  1144→
+  1145→      {/* Score Breakdown */}
+  1146→      {check.breakdown && (
+  1147→        <div className="p-5 bg-white border border-slate-200 rounded-lg">
+  1148→          <div className="flex items-center gap-2 mb-4">
+  1149→            <Target className="h-4 w-4 text-slate-600" strokeWidth={1.75} />
+  1150→            <h3 className="font-bold text-slate-950">Score Breakdown</h3>
+  1151→          </div>
+  1152→          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+  1153→            <div>
+  1154→              <div className="text-xs font-bold uppercase tracking-wider text-emerald-600 mb-2">Factores positivos (Trust)</div>
+  1155→              {check.breakdown.trust_components?.map((c: any, i: number) => (
+  1156→                <div key={i} className="flex items-center justify-between text-sm py-1">
+  1157→                  <span className="text-slate-600">{c.label}</span>
+  1158→                  <span className="text-emerald-600 font-semibold">+{c.points}</span>
+  1159→                </div>
+  1160→              ))}
+  1161→            </div>
+  1162→            <div>
+  1163→              <div className="text-xs font-bold uppercase tracking-wider text-rose-600 mb-2">Factores de riesgo</div>
+  1164→              {check.breakdown.risk_components?.map((c: any, i: number) => (
+  1165→                <div key={i} className="flex items-center justify-between text-sm py-1">
+  1166→                  <span className="text-slate-600">{c.label}</span>
+  1167→                  <span className="text-rose-600 font-semibold">+{c.points}</span>
+  1168→                </div>
+  1169→              ))}
+  1170→            </div>
+  1171→          </div>
+  1172→        </div>
+  1173→      )}
+  1174→
+  1175→      {/* AI Report */}
+  1176→      {check.ai_report && (
+  1177→        <div className="p-5 bg-white border border-slate-200 rounded-lg">
+  1178→          <div className="flex items-center gap-2 mb-4">
+  1179→            <Brain className="h-4 w-4 text-slate-600" strokeWidth={1.75} />
+  1180→            <h3 className="font-bold text-slate-950">AI Investigation Report</h3>
+  1181→          </div>
+  1182→          <div className="prose prose-sm max-w-none text-slate-700">
+  1183→            {check.ai_report.split('\n').map((line: string, i: number) => {
+  1184→              if (line.startsWith('## ')) return <h2 key={i} className="text-lg font-bold text-slate-950 mt-4 mb-2">{line.slice(3)}</h2>
+  1185→              if (line.startsWith('**') && line.endsWith('**')) return <p key={i} className="font-semibold text-slate-950">{line.replace(/\*\*/g, '')}</p>
+  1186→              if (line.trim() === '') return <br key={i} />
+  1187→              return <p key={i} className="mb-1">{line}</p>
+  1188→            })}
+  1189→          </div>
+  1190→        </div>
+  1191→      )}
+  1192→
+  1193→      {/* Sources */}
+  1194→      {check.sources_consulted?.length > 0 && (
+  1195→        <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
+  1196→          <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Fuentes consultadas</div>
+  1197→          <div className="flex flex-wrap gap-2">
+  1198→            {check.sources_consulted.map((s: string, i: number) => (
+  1199→              <span key={i} className="px-2 py-1 bg-white border border-slate-200 rounded text-xs font-mono text-slate-600">{s}</span>
+  1200→            ))}
+  1201→          </div>
+  1202→        </div>
+  1203→      )}
+  1204→    </div>
+  1205→  )
+  1206→}
+  1207→
+  1208→// ==================== History ====================
+  1209→function HistoryView() {
+  1210→  const token = useToken()
+  1211→  const { navigate } = useRouter()
+  1212→  const [checks, setChecks] = useState<any[]>([])
+  1213→  const [loading, setLoading] = useState(true)
+  1214→  const [search, setSearch] = useState('')
+  1215→  const [riskFilter, setRiskFilter] = useState('')
+  1216→
+  1217→  useEffect(() => {
+  1218→    if (token) {
+  1219→      const params = new URLSearchParams()
+  1220→      if (search) params.set('q', search)
+  1221→      if (riskFilter) params.set('risk_level', riskFilter)
+  1222→      API.get(`/api/checks?${params.toString()}`, token).then(d => { setChecks(Array.isArray(d) ? d : []); setLoading(false) })
+  1223→    } else {
+  1224→      setLoading(false)
+  1225→    }
+  1226→    // eslint-disable-next-line react-hooks/set-state-in-effect
+  1227→  }, [token, search, riskFilter])
+  1228→
+  1229→  return (
+  1230→    <div className="p-6 lg:p-8 space-y-6">
+  1231→      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+  1232→        <div>
+  1233→          <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-600 mb-1.5">Historial</div>
+  1234→          <h1 className="text-3xl font-extrabold tracking-tighter text-slate-950">Background Checks</h1>
+  1235→        </div>
+  1236→        <button onClick={() => navigate('new-check')}
+  1237→          className="inline-flex items-center gap-2 bg-slate-950 text-white px-5 py-2.5 rounded-md font-semibold text-sm">
+  1238→          <Plus className="h-4 w-4" /> Nuevo Check
+  1239→        </button>
+  1240→      </div>
+  1241→
+  1242→      <div className="flex gap-3">
+  1243→        <div className="flex-1 relative">
+  1244→          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+  1245→          <input value={search} onChange={e => setSearch(e.target.value)}
+  1246→            className="w-full pl-10 pr-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-950"
+  1247→            placeholder="Buscar por nombre..." />
+  1248→        </div>
+  1249→        <select value={riskFilter} onChange={e => setRiskFilter(e.target.value)}
+  1250→          className="px-3 py-2 border border-slate-200 rounded-md text-sm">
+  1251→          <option value="">Todos los niveles</option>
+  1252→          <option value="BAJO">Bajo</option>
+  1253→          <option value="MEDIO">Medio</option>
+  1254→          <option value="ALTO">Alto</option>
+  1255→          <option value="CRITICO">Crítico</option>
+  1256→        </select>
+  1257→      </div>
+  1258→
+  1259→      {loading ? <div className="animate-pulse space-y-3">{[1,2,3].map(i => <div key={i} className="h-16 bg-slate-200 rounded-lg" />)}</div> : (
+  1260→        <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+  1261→          <table className="w-full">
+  1262→            <thead className="bg-slate-50">
+  1263→              <tr>
+  1264→                <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-400">Sujeto</th>
+  1265→                <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-400">Trust</th>
+  1266→                <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-400">Risk</th>
+  1267→                <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-400">Nivel</th>
+  1268→                <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-400">Fecha</th>
+  1269→                <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-400"></th>
+  1270→              </tr>
+  1271→            </thead>
+  1272→            <tbody>
+  1273→              {checks.map((c: any) => (
+  1274→                <tr key={c.id} className="border-t border-slate-100 hover:bg-slate-50 cursor-pointer" onClick={() => navigate('check-results', { checkId: c.id })}>
+  1275→                  <td className="px-4 py-3 text-sm font-medium text-slate-950">{c.subject?.full_name}</td>
+  1276→                  <td className="px-4 py-3 text-sm font-bold text-emerald-600">{c.trust_score}</td>
+  1277→                  <td className="px-4 py-3 text-sm font-bold" style={{ color: RISK_COLORS[c.risk_level] }}>{c.risk_score}</td>
+  1278→                  <td className="px-4 py-3">
+  1279→                    <span className="px-2 py-0.5 rounded text-xs font-bold text-white" style={{ backgroundColor: RISK_COLORS[c.risk_level] }}>{c.risk_level}</span>
+  1280→                  </td>
+  1281→                  <td className="px-4 py-3 text-xs text-slate-500 font-mono">{c.created_at?.slice(0, 10)}</td>
+  1282→                  <td className="px-4 py-3"><ArrowRight className="h-4 w-4 text-slate-300" /></td>
+  1283→                </tr>
+  1284→              ))}
+  1285→            </tbody>
+  1286→          </table>
+  1287→          {checks.length === 0 && (
+  1288→            <div className="p-12 text-center text-slate-400">
+  1289→              <FileSearch className="h-8 w-8 mx-auto mb-3" />
+  1290→              <p>No hay checks. Crea el primero.</p>
+  1291→            </div>
+  1292→          )}
+  1293→        </div>
+  1294→      )}
+  1295→    </div>
+  1296→  )
+  1297→}
+  1298→
+  1299→// ==================== CURP Validator ====================
+  1300→function CurpValidatorView() {
+  1301→  const token = useToken()
+  1302→  const { toast } = useToast()
+  1303→  const [curp, setCurp] = useState('')
+  1304→  const [result, setResult] = useState<any>(null)
+  1305→  const [loading, setLoading] = useState(false)
+  1306→
+  1307→  const validate = async () => {
+  1308→    setLoading(true)
+  1309→    const data = await API.post('/api/identity/curp', { curp }, token)
+  1310→    setResult(data)
+  1311→    setLoading(false)
+  1312→    toast({ title: data.is_valid ? 'CURP Válido' : 'CURP Inválido', description: data.message })
+  1313→  }
+  1314→
+  1315→  return (
+  1316→    <div className="p-6 lg:p-8 max-w-2xl mx-auto">
+  1317→      <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-600 mb-1.5">Herramienta</div>
+  1318→      <h1 className="text-3xl font-extrabold tracking-tighter text-slate-950 mb-2">Validador de CURP</h1>
+  1319→      <p className="text-sm text-slate-500 mb-6">Validación contra algoritmo oficial mexicano con dígito verificador.</p>
+  1320→
+  1321→      <div className="bg-white p-6 rounded-lg border border-slate-200 space-y-4">
+  1322→        <div>
+  1323→          <label className="text-sm font-medium text-slate-700 mb-1 block">CURP</label>
+  1324→          <input value={curp} onChange={e => setCurp(e.target.value.toUpperCase())} maxLength={18}
+  1325→            className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-950"
+  1326→            placeholder="PEGJ800101HDFRRN09" />
+  1327→        </div>
+  1328→        <button onClick={validate} disabled={loading || !curp}
+  1329→          className="bg-slate-950 text-white px-5 py-2.5 rounded-md font-semibold text-sm hover:bg-slate-800 disabled:opacity-50">
+  1330→          {loading ? 'Validando...' : 'Validar CURP'}
+  1331→        </button>
+  1332→      </div>
+  1333→
+  1334→      {result && (
+  1335→        <div className={`mt-6 p-6 rounded-lg border ${result.is_valid ? 'border-emerald-200 bg-emerald-50' : 'border-rose-200 bg-rose-50'}`}>
+  1336→          <div className="flex items-center gap-2 mb-3">
+  1337→            {result.is_valid ? <CheckCircle2 className="h-5 w-5 text-emerald-600" /> : <XCircle className="h-5 w-5 text-rose-600" />}
+  1338→            <span className="font-bold text-lg">{result.is_valid ? 'CURP Válido' : 'CURP Inválido'}</span>
+  1339→          </div>
+  1340→          <p className="text-sm">{result.message}</p>
+  1341→          {result.components && (
+  1342→            <div className="mt-4 space-y-2 text-sm">
+  1343→              <div className="flex justify-between"><span className="text-slate-500">Fecha nacimiento</span><span className="font-medium">{result.components.birth_date}</span></div>
+  1344→              <div className="flex justify-between"><span className="text-slate-500">Sexo</span><span className="font-medium">{result.components.sex}</span></div>
+  1345→              <div className="flex justify-between"><span className="text-slate-500">Estado</span><span className="font-medium">{result.components.state}</span></div>
+  1346→              <div className="flex justify-between"><span className="text-slate-500">Dígito verificador</span><span className="font-medium">{result.check_digit_valid ? '✓ Correcto' : '✗ Incorrecto'}</span></div>
+  1347→            </div>
+  1348→          )}
+  1349→        </div>
+  1350→      )}
+  1351→    </div>
+  1352→  )
+  1353→}
+  1354→
+  1355→// ==================== RFC Validator ====================
+  1356→function RfcValidatorView() {
+  1357→  const token = useToken()
+  1358→  const { toast } = useToast()
+  1359→  const [rfc, setRfc] = useState('')
+  1360→  const [result, setResult] = useState<any>(null)
+  1361→  const [loading, setLoading] = useState(false)
+  1362→
+  1363→  const validate = async () => {
+  1364→    setLoading(true)
+  1365→    const data = await API.post('/api/identity/rfc', { rfc }, token)
+  1366→    setResult(data)
+  1367→    setLoading(false)
+  1368→    toast({ title: data.is_valid ? 'RFC Válido' : 'RFC Inválido', description: data.message })
+  1369→  }
+  1370→
+  1371→  return (
+  1372→    <div className="p-6 lg:p-8 max-w-2xl mx-auto">
+  1373→      <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-600 mb-1.5">Herramienta</div>
+  1374→      <h1 className="text-3xl font-extrabold tracking-tighter text-slate-950 mb-2">Validador de RFC</h1>
+  1375→      <p className="text-sm text-slate-500 mb-6">Validación para persona física (13) y moral (12) con verificación SAT.</p>
+  1376→
+  1377→      <div className="bg-white p-6 rounded-lg border border-slate-200 space-y-4">
+  1378→        <div>
+  1379→          <label className="text-sm font-medium text-slate-700 mb-1 block">RFC</label>
+  1380→          <input value={rfc} onChange={e => setRfc(e.target.value.toUpperCase())} maxLength={13}
+  1381→            className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-slate-950"
+  1382→            placeholder="PEGJ800101AB1" />
+  1383→        </div>
+  1384→        <button onClick={validate} disabled={loading || !rfc}
+  1385→          className="bg-slate-950 text-white px-5 py-2.5 rounded-md font-semibold text-sm hover:bg-slate-800 disabled:opacity-50">
+  1386→          {loading ? 'Validando...' : 'Validar RFC'}
+  1387→        </button>
+  1388→      </div>
+  1389→
+  1390→      {result && (
+  1391→        <div className={`mt-6 p-6 rounded-lg border ${result.is_valid ? 'border-emerald-200 bg-emerald-50' : 'border-rose-200 bg-rose-50'}`}>
+  1392→          <div className="flex items-center gap-2 mb-3">
+  1393→            {result.is_valid ? <CheckCircle2 className="h-5 w-5 text-emerald-600" /> : <XCircle className="h-5 w-5 text-rose-600" />}
+  1394→            <span className="font-bold text-lg">{result.is_valid ? 'RFC Válido' : 'RFC Inválido'}</span>
+  1395→          </div>
+  1396→          <p className="text-sm">{result.message}</p>
+  1397→          {result.components && (
+  1398→            <div className="mt-4 space-y-2 text-sm">
+  1399→              <div className="flex justify-between"><span className="text-slate-500">Tipo</span><span className="font-medium">{result.type === 'fisica' ? 'Persona Física' : 'Persona Moral'}</span></div>
+  1400→              <div className="flex justify-between"><span className="text-slate-500">Fecha</span><span className="font-medium">{result.components.date}</span></div>
+  1401→              <div className="flex justify-between"><span className="text-slate-500">SAT Status</span><span className={`font-medium ${result.sat_status === 'ACTIVO' ? 'text-emerald-600' : 'text-rose-600'}`}>{result.sat_status}</span></div>
+  1402→            </div>
+  1403→          )}
+  1404→        </div>
+  1405→      )}
+  1406→    </div>
+  1407→  )
+  1408→}
+  1409→
+  1410→// ==================== Sanctions Screening ====================
+  1411→function SanctionsView() {
+  1412→  const token = useToken()
+  1413→  const { toast } = useToast()
+  1414→  const [name, setName] = useState('')
+  1415→  const [result, setResult] = useState<any>(null)
+  1416→  const [loading, setLoading] = useState(false)
+  1417→
+  1418→  const screen = async () => {
+  1419→    setLoading(true)
+  1420→    const data = await API.post('/api/sanctions/screen', { full_name: name }, token)
+  1421→    setResult(data)
+  1422→    setLoading(false)
+  1423→    toast({ title: data.is_sanctioned ? 'ALERTA' : 'Limpio', description: data.is_sanctioned ? 'Match en listas de sanciones' : data.is_pep ? 'PEP detectado' : 'Sin coincidencias' })
+  1424→  }
+  1425→
+  1426→  return (
+  1427→    <div className="p-6 lg:p-8 max-w-3xl mx-auto">
+  1428→      <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-600 mb-1.5">Herramienta</div>
+  1429→      <h1 className="text-3xl font-extrabold tracking-tighter text-slate-950 mb-2">Screening de Sanciones</h1>
+  1430→      <p className="text-sm text-slate-500 mb-6">Fuzzy matching contra OFAC, ONU, PEP, SAT 69-B, Interpol y más.</p>
+  1431→
+  1432→      <div className="bg-white p-6 rounded-lg border border-slate-200 space-y-4">
+  1433→        <div>
+  1434→          <label className="text-sm font-medium text-slate-700 mb-1 block">Nombre completo</label>
+  1435→          <input value={name} onChange={e => setName(e.target.value)}
+  1436→            className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-slate-950"
+  1437→            placeholder="Juan Pérez García" />
+  1438→        </div>
+  1439→        <button onClick={screen} disabled={loading || !name}
+  1440→          className="bg-slate-950 text-white px-5 py-2.5 rounded-md font-semibold text-sm hover:bg-slate-800 disabled:opacity-50">
+  1441→          {loading ? 'Screening...' : 'Ejecutar Screening'}
+  1442→        </button>
+  1443→      </div>
+  1444→
+  1445→      {result && (
+  1446→        <div className={`mt-6 p-6 rounded-lg border ${result.is_sanctioned ? 'border-rose-200 bg-rose-50' : result.is_pep ? 'border-amber-200 bg-amber-50' : 'border-emerald-200 bg-emerald-50'}`}>
+  1447→          <div className="flex items-center gap-2 mb-3">
+  1448→            {result.is_sanctioned ? <XCircle className="h-5 w-5 text-rose-600" /> : result.is_pep ? <AlertTriangle className="h-5 w-5 text-amber-600" /> : <CheckCircle2 className="h-5 w-5 text-emerald-600" />}
+  1449→            <span className="font-bold text-lg">
+  1450→              {result.is_sanctioned ? 'Match en Listas de Sanciones' : result.is_pep ? 'Persona Expuesta Políticamente' : 'Sin Coincidencias'}
+  1451→            </span>
+  1452→          </div>
+  1453→
+  1454→          {result.matches?.length > 0 && (
+  1455→            <div className="mt-4 space-y-3">
+  1456→              <h4 className="text-sm font-bold text-slate-950">Coincidencias:</h4>
+  1457→              {result.matches.map((m: any, i: number) => (
+  1458→                <div key={i} className="p-3 bg-white rounded border border-slate-200">
+  1459→                  <div className="flex items-center justify-between">
+  1460→                    <span className="font-semibold text-slate-950">{m.matched_name}</span>
+  1461→                    <span className="px-2 py-0.5 rounded text-xs font-bold bg-slate-100">{m.score}%</span>
+  1462→                  </div>
+  1463→                  <div className="text-xs text-slate-500 mt-1">{m.list_name} · {m.type} · {m.country} · {m.program}</div>
+  1464→                </div>
+  1465→              ))}
+  1466→            </div>
+  1467→          )}
+  1468→
+  1469→          <div className="mt-4 text-xs text-slate-400">
+  1470→            {result.lists_checked?.length} listas consultadas · {result.total_records_screened} registros · Threshold: {result.threshold_used}%
+  1471→          </div>
+  1472→        </div>
+  1473→      )}
+  1474→    </div>
+  1475→  )
+  1476→}
+  1477→
+  1478→// ==================== API Docs ====================
+  1479→function ApiDocsView() {
+  1480→  const endpoints = [
+  1481→    { method: 'POST', path: '/api/auth/register', desc: 'Crear cuenta', body: '{ email, password, fullName }' },
+  1482→    { method: 'POST', path: '/api/auth/login', desc: 'Iniciar sesión', body: '{ email, password }' },
+  1483→    { method: 'POST', path: '/api/identity/curp', desc: 'Validar CURP', body: '{ curp, full_name? }' },
+  1484→    { method: 'POST', path: '/api/identity/rfc', desc: 'Validar RFC', body: '{ rfc }' },
+  1485→    { method: 'POST', path: '/api/government/renapo', desc: 'Consulta RENAPO', body: '{ curp }' },
+  1486→    { method: 'POST', path: '/api/government/sat', desc: 'Consulta SAT', body: '{ rfc }' },
+  1487→    { method: 'POST', path: '/api/sanctions/screen', desc: 'Screening sanciones', body: '{ full_name, threshold? }' },
+  1488→    { method: 'POST', path: '/api/digital/email', desc: 'Inteligencia de email', body: '{ email }' },
+  1489→    { method: 'POST', path: '/api/digital/phone', desc: 'Inteligencia de teléfono', body: '{ phone }' },
+  1490→    { method: 'POST', path: '/api/digital/username', desc: 'Descubrimiento de username', body: '{ username }' },
+  1491→    { method: 'POST', path: '/api/checks', desc: 'Background check completo', body: '{ full_name, curp?, rfc?, email?, phone?, username?, include_*? }' },
+  1492→    { method: 'GET', path: '/api/checks', desc: 'Listar checks', body: '?q=&risk_level=' },
+  1493→    { method: 'GET', path: '/api/checks/:id', desc: 'Detalle de check', body: '' },
+  1494→    { method: 'GET', path: '/api/analytics/dashboard', desc: 'Dashboard analytics', body: '' },
+  1495→  ]
+  1496→
+  1497→  return (
+  1498→    <div className="p-6 lg:p-8 max-w-4xl mx-auto">
+  1499→      <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-blue-600 mb-1.5">Documentación</div>
+  1500→      <h1 className="text-3xl font-extrabold tracking-tighter text-slate-950 mb-2">API Reference</h1>
+  1501→      <p className="text-sm text-slate-500 mb-6">REST API para integraciones con CRMs, ERPs, fintechs y bancos.</p>
+  1502→
+  1503→      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+  1504→        <table className="w-full">
+  1505→          <thead className="bg-slate-50">
+  1506→            <tr>
+  1507→              <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-400">Method</th>
+  1508→              <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-400">Endpoint</th>
+  1509→              <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-400">Descripción</th>
+  1510→              <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-400">Body / Params</th>
+  1511→            </tr>
+  1512→          </thead>
+  1513→          <tbody>
+  1514→            {endpoints.map((ep, i) => (
+  1515→              <tr key={i} className="border-t border-slate-100">
+  1516→                <td className="px-4 py-3">
+  1517→                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${ep.method === 'POST' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>{ep.method}</span>
+  1518→                </td>
+  1519→                <td className="px-4 py-3 text-xs font-mono text-slate-950">{ep.path}</td>
+  1520→                <td className="px-4 py-3 text-sm text-slate-600">{ep.desc}</td>
+  1521→                <td className="px-4 py-3 text-xs font-mono text-slate-400">{ep.body}</td>
+  1522→              </tr>
+  1523→            ))}
+  1524→          </tbody>
+  1525→        </table>
+  1526→      </div>
+  1527→
+  1528→      <div className="mt-8 p-6 bg-slate-950 rounded-lg text-white">
+  1529→        <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Ejemplo: Background Check completo</div>
+  1530→        <pre className="text-xs font-mono text-slate-300 leading-relaxed overflow-x-auto">{`curl -X POST /api/checks \\
+  1531→  -H "Authorization: Bearer YOUR_TOKEN" \\
+  1532→  -H "Content-Type: application/json" \\
+  1533→  -d '{
+  1534→    "full_name": "Juan Pérez García",
+  1535→    "curp": "PEGJ800101HDFRRN09",
+  1536→    "rfc": "PEGJ800101AB1",
+  1537→    "email": "juan@empresa.mx",
+  1538→    "include_ai_report": true
+  1539→  }'
+  1540→
+  1541→# Response:
+  1542→# trust_score: 92 | risk_level: BAJO | recommendation: APPROVE`}</pre>
+  1543→      </div>
+  1544→    </div>
+  1545→  )
+  1546→}
+  1547→
+  1548→// ==================== Seed Admin User ====================
+  1549→function useSeedAdmin() {
+  1550→  const { token } = useAuth()
+  1551→  const [seeded, setSeeded] = useState(false)
+  1552→  useEffect(() => {
+  1553→    if (!seeded) {
+  1554→      API.post('/api/auth/register', {
+  1555→        email: 'admin@synkdata.mx', password: 'Admin2026!', fullName: 'Admin SynkData', role: 'admin', organization: 'SynkData'
+  1556→      }).then(() => setSeeded(true)).catch(() => setSeeded(true))
+  1557→    }
+  1558→  }, [seeded])
+  1559→}
+  1560→
+  1561→// ==================== Main App ====================
+  1562→export default function Home() {
+  1563→  const [view, setView] = useState<View>('landing')
+  1564→  const [viewData, setViewData] = useState<any>(null)
+  1565→  const [mounted, setMounted] = useState(false)
+  1566→  const { user, login: authLogin, logout: authLogout } = useAuth()
+  1567→
+  1568→  // After mount, read localStorage and set correct view
+  1569→  useEffect(() => {
+  1570→    const savedView = localStorage.getItem('synkdata_view') as View | null
+  1571→    const token = localStorage.getItem('synkdata_token')
+  1572→    if (token && user) {
+  1573→      setView(savedView && savedView !== 'landing' && savedView !== 'login' && savedView !== 'register' ? savedView : 'dashboard')
+  1574→    } else if (token && !user) {
+  1575→      // Token exists but user not loaded yet - will be handled by auth provider
+  1576→      setView('dashboard')
+  1577→    } else {
+  1578→      setView('landing')
+  1579→    }
+  1580→    setMounted(true)
+  1581→    // eslint-disable-next-line react-hooks/set-state-in-effect
+  1582→  }, [])
+  1583→
+  1584→  // Also redirect when user changes after mount
+  1585→  useEffect(() => {
+  1586→    if (!mounted) return
+  1587→    if (user && (view === 'landing' || view === 'login' || view === 'register')) {
+  1588→      setView('dashboard')
+  1589→      localStorage.setItem('synkdata_view', 'dashboard')
+  1590→    }
+  1591→    // eslint-disable-next-line react-hooks/set-state-in-effect
+  1592→  }, [user, mounted, view])
+  1593→
+  1594→  const navigate = useCallback((v: View, data?: any) => {
+  1595→    setView(v)
+  1596→    setViewData(data || null)
+  1597→    if (typeof window !== 'undefined') {
+  1598→      localStorage.setItem('synkdata_view', v)
+  1599→    }
+  1600→  }, [])
+  1601→
+  1602→  const renderView = () => {
+  1603→    // If not mounted yet (SSR/hydration), show nothing
+  1604→    if (!mounted) return <div className="min-h-screen bg-white" />
+  1605→
+  1606→    switch (view) {
+  1607→      case 'landing': return <LandingView />
+  1608→      case 'login': return user ? <DashboardLayout><DashboardView /></DashboardLayout> : <LoginView />
+  1609→      case 'register': return user ? <DashboardLayout><DashboardView /></DashboardLayout> : <RegisterView />
+  1610→      case 'dashboard': return <DashboardLayout><DashboardView /></DashboardLayout>
+  1611→      case 'new-check': return <DashboardLayout><NewCheckView /></DashboardLayout>
+  1612→      case 'check-results': return <DashboardLayout><CheckResultsView /></DashboardLayout>
+  1613→      case 'history': return <DashboardLayout><HistoryView /></DashboardLayout>
+  1614→      case 'curp': return <DashboardLayout><CurpValidatorView /></DashboardLayout>
+  1615→      case 'rfc': return <DashboardLayout><RfcValidatorView /></DashboardLayout>
+  1616→      case 'sanctions': return <DashboardLayout><SanctionsView /></DashboardLayout>
+  1617→      case 'api-docs': return <DashboardLayout><ApiDocsView /></DashboardLayout>
+  1618→      default: return <LandingView />
+  1619→    }
+  1620→  }
+  1621→
+  1622→  return (
+  1623→    <RouterContext.Provider value={{ view, navigate, viewData }}>
+  1624→      {renderView()}
+  1625→    </RouterContext.Provider>
+  1626→  )
+  1627→}
+  1628→

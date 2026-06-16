@@ -37,6 +37,12 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --color-sirax-navy: var(--sirax-navy);
+  --color-sirax-navy-soft: var(--sirax-navy-soft);
+  --color-sirax-navy-line: var(--sirax-navy-line);
+  --color-sirax-teal: var(--sirax-teal);
+  --color-sirax-teal-bright: var(--sirax-teal-bright);
+  --color-sirax-teal-soft: var(--sirax-teal-soft);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -45,6 +51,15 @@
 
 :root {
   --radius: 0.625rem;
+
+  /* Sirax brand palette */
+  --sirax-navy: #0a192f;
+  --sirax-navy-soft: #0f2138;
+  --sirax-navy-line: #1a2f4f;
+  --sirax-teal: #00d1a0;
+  --sirax-teal-bright: #2ee8b8;
+  --sirax-teal-soft: rgba(0, 209, 160, 0.12);
+
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -119,4 +134,148 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* ==================== Sirax brand utilities ==================== */
+.bg-sirax-navy {
+  background-color: var(--sirax-navy);
+}
+.bg-sirax-navy-soft {
+  background-color: var(--sirax-navy-soft);
+}
+.bg-sirax-navy-line {
+  background-color: var(--sirax-navy-line);
+}
+.text-sirax-teal {
+  color: var(--sirax-teal);
+}
+.text-sirax-teal-bright {
+  color: var(--sirax-teal-bright);
+}
+.bg-sirax-teal {
+  background-color: var(--sirax-teal);
+}
+.border-sirax-teal {
+  border-color: var(--sirax-teal);
+}
+.ring-sirax-teal {
+  --tw-ring-color: var(--sirax-teal);
+}
+
+/* Sirax wordmark — square dot on the "i", teal diagonal on the "x" */
+.sirax-wordmark {
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  display: inline-flex;
+  align-items: baseline;
+}
+.sirax-wordmark .i-dot {
+  display: inline-block;
+  width: 0.18em;
+  height: 0.18em;
+  background: var(--sirax-teal);
+  border-radius: 1px;
+  margin: 0 0.06em 0.18em 0.06em;
+  position: relative;
+  top: -0.05em;
+}
+.sirax-wordmark .x-teal {
+  color: var(--sirax-teal);
+}
+
+/* Subtle grid pattern for hero */
+.sirax-grid {
+  background-image:
+    linear-gradient(rgba(0, 209, 160, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 209, 160, 0.06) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+  mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+}
+
+/* Animated gradient text */
+.sirax-gradient-text {
+  background: linear-gradient(
+    100deg,
+    #ffffff 0%,
+    #ffffff 35%,
+    var(--sirax-teal-bright) 60%,
+    #ffffff 85%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: sirax-shimmer 6s linear infinite;
+}
+@keyframes sirax-shimmer {
+  0% { background-position: 0% center; }
+  100% { background-position: 200% center; }
+}
+
+/* Floating pulse dot */
+.sirax-pulse-dot {
+  position: relative;
+}
+.sirax-pulse-dot::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 9999px;
+  background: var(--sirax-teal);
+  opacity: 0.6;
+  animation: sirax-ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+@keyframes sirax-ping {
+  75%, 100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+/* Scroll-reveal helper (fallback if framer-motion is not yet hydrated) */
+.sirax-reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1), transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.sirax-reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* Hide scrollbar but keep scroll for marquee */
+.sirax-no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.sirax-no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Marquee animation */
+@keyframes sirax-marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.sirax-marquee {
+  animation: sirax-marquee 28s linear infinite;
+}
+
+/* Soft glow used behind hero cards */
+.sirax-glow-teal {
+  background: radial-gradient(circle at center, rgba(0, 209, 160, 0.45) 0%, rgba(0, 209, 160, 0) 70%);
+  filter: blur(20px);
+}
+
+/* Custom selection */
+::selection {
+  background: var(--sirax-teal);
+  color: var(--sirax-navy);
+}
+
+/* Smooth scroll */
+html {
+  scroll-behavior: smooth;
 }
