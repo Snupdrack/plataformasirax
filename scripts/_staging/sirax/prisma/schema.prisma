@@ -1,0 +1,57 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  fullName     String
+  role         String   @default("analyst")
+  organization String?
+  checks       Check[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Check {
+  id                  String   @id @default(cuid())
+  userId              String
+  subjectName         String
+  subjectCurp         String?
+  subjectRfc          String?
+  subjectEmail        String?
+  subjectPhone        String?
+  subjectUsername     String?
+  subjectAddress      String?
+  includeGovernment   Boolean  @default(true)
+  includeSanctions    Boolean  @default(true)
+  includeDigital      Boolean  @default(true)
+  includeRelationship Boolean  @default(true)
+  includeAiReport     Boolean  @default(true)
+  curpValidation      String?
+  rfcValidation       String?
+  government          String?
+  sanctions           String?
+  digitalIdentity     String?
+  digitalFootprint    String?
+  relationshipGraph   String?
+  trustScore          Float    @default(0)
+  riskScore           Float    @default(0)
+  identityConfidence  Float    @default(0)
+  riskLevel           String   @default("BAJO")
+  recommendation      String   @default("APPROVE")
+  flags               String?
+  breakdown           String?
+  aiReport            String?
+  sourcesConsulted    String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}

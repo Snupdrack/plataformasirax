@@ -1,0 +1,69 @@
+# Sirax · Synkdata — Production docker-compose
+# Usage:
+#   1. Edit JWT_SECRET, POSTGRES_PASSWORD, domain in Caddyfile
+#   2. docker compose up -d --build
+
+services:
+  sirax:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sirax
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_EXPIRE: 7d
+      DATABASE_URL: postgresql://sirax:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/sirax?schema=public
+      NEXT_PUBLIC_APP_NAME: Sirax
+      NEXT_PUBLIC_APP_VENDOR: Synkdata
+      NEXT_PUBLIC_APP_URL: ${APP_URL:?APP_URL is required}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - sirax-net
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: sirax-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sirax
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: sirax
+    volumes:
+      - sirax-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sirax -d sirax"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - sirax-net
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: sirax-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - sirax-caddy-data:/data
+      - sirax-caddy-config:/config
+    depends_on:
+      - sirax
+    networks:
+      - sirax-net
+
+volumes:
+  sirax-pgdata:
+  sirax-caddy-data:
+  sirax-caddy-config:
+
+networks:
+  sirax-net:
+    driver: bridge
