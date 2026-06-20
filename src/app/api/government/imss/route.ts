@@ -9,6 +9,6 @@ export async function POST(request: Request) {
   if (!payload) return NextResponse.json({ error: 'Token inválido' }, { status: 401 })
 
   const { nss, curp } = await request.json()
-  const result = queryImss(nss, curp)
+  const result = await queryImss(nss, curp)
   return NextResponse.json(result)
 }

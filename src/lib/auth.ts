@@ -1,7 +1,24 @@
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
+import { randomBytes } from 'crypto'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'synkdata-dev-secret-2026'
+function resolveJwtSecret(): string {
+  const fromEnv = process.env.JWT_SECRET
+  if (fromEnv) return fromEnv
+
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('JWT_SECRET no está configurado. Defínelo en tu .env antes de arrancar en producción.')
+  }
+
+  // Solo en desarrollo: secreto aleatorio por proceso (nunca hardcodeado ni
+  // commiteado). Esto invalida los tokens cada vez que reinicias el server
+  // en dev, lo cual es esperado y seguro — evita tener un secreto público
+  // conocido en el repositorio.
+  console.warn('[auth] JWT_SECRET no configurado — usando secreto temporal de desarrollo (los tokens no persisten entre reinicios).')
+  return randomBytes(32).toString('hex')
+}
+
+const JWT_SECRET = resolveJwtSecret()
 const JWT_EXPIRE = '7d'
 
 export async function hashPassword(password: string): Promise<string> {

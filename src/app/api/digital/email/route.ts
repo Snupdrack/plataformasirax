@@ -9,6 +9,6 @@ export async function POST(request: Request) {
   if (!payload) return NextResponse.json({ error: 'Token inválido' }, { status: 401 })
 
   const { email } = await request.json()
-  const result = enrichEmail(email)
+  const result = await enrichEmail(email)
   return NextResponse.json(result)
 }

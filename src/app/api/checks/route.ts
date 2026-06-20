@@ -5,7 +5,9 @@ import {
   validateCurp, validateRfc, queryRenapo, querySat, queryImss, queryRnd,
   screenSanctions, enrichEmail, enrichPhone, discoverUsername,
   calculateDigitalFootprint, buildRelationshipGraph, calculateScores,
+  correlateIdentity,
 } from '@/lib/synkdata'
+import { generateAiNarrative } from '@/lib/providers/ai-report'
 
 export async function POST(request: Request) {
   const token = getTokenFromHeaders(request.headers)
@@ -27,65 +29,83 @@ export async function POST(request: Request) {
     }
 
     const sourcesConsulted: string[] = []
+    const sourcesUnavailable: string[] = []
     const modules: any = {}
 
-    // 1. Identity Verification
+    const trackSource = (label: string, available: boolean, detail?: string) => {
+      if (available) sourcesConsulted.push(label)
+      else sourcesUnavailable.push(detail ? `${label}: ${detail}` : label)
+    }
+
+    // 1. Identity Verification (algoritmo, siempre disponible)
     if (curp) {
       modules.curp_validation = validateCurp(curp, full_name)
-      sourcesConsulted.push('RENAPO (algoritmo CURP)')
+      sourcesConsulted.push('Algoritmo oficial CURP')
     }
     if (rfc) {
       modules.rfc_validation = validateRfc(rfc)
-      sourcesConsulted.push('SAT (algoritmo RFC)')
+      sourcesConsulted.push('Algoritmo oficial RFC')
     }
 
-    // 2. Government Intelligence
+    // 2. Government Intelligence (consultas reales en paralelo)
     if (include_government) {
       const gov: any = {}
-      if (curp) {
-        gov.renapo = queryRenapo(curp, full_name)
-        sourcesConsulted.push('RENAPO')
-      }
-      if (rfc) {
-        gov.sat = querySat(rfc)
-        sourcesConsulted.push('SAT')
-      }
-      if (body.nss || curp) {
-        gov.imss = queryImss(body.nss, curp)
-        sourcesConsulted.push('IMSS')
-      }
       const nameParts = full_name.split(' ')
-      gov.rnd = queryRnd(nameParts[0], nameParts[1] || '', nameParts[2], body.estado)
-      sourcesConsulted.push('RND (SSPC)')
+
+      const [renapoResult, satResult, imssResult, rndResult] = await Promise.all([
+        curp ? queryRenapo(curp, full_name) : Promise.resolve(null),
+        rfc ? querySat(rfc) : Promise.resolve(null),
+        curp ? queryImss(body.nss, curp) : Promise.resolve(null),
+        queryRnd(nameParts[0], nameParts[1] || '', nameParts[2], body.estado),
+      ])
+
+      if (renapoResult) { gov.renapo = renapoResult; trackSource('RENAPO (Nubarium)', renapoResult.available, renapoResult.message || renapoResult.error) }
+      if (satResult) { gov.sat = satResult; trackSource('SAT (Nubarium)', satResult.available, satResult.message || satResult.error) }
+      if (imssResult) { gov.imss = imssResult; trackSource('IMSS (Nubarium)', imssResult.available, imssResult.message || imssResult.error) }
+      gov.rnd = rndResult
+      trackSource('RND (SSPC)', false, rndResult.message)
+
       modules.government = gov
     }
 
-    // 3. Sanctions Screening
+    // 3. Sanctions Screening (real: OpenSanctions + Nubarium PEP)
     if (include_sanctions) {
-      modules.sanctions = screenSanctions(full_name)
-      sourcesConsulted.push('OFAC SDN', 'ONU', 'OpenSanctions', 'PEP', 'SAT 69-B', 'Interpol')
+      modules.sanctions = await screenSanctions(full_name)
+      for (const s of modules.sanctions.sources_available) sourcesConsulted.push(s)
+      for (const s of modules.sanctions.sources_unavailable) sourcesUnavailable.push(s)
     }
 
-    // 4. Digital Identity Intelligence
+    // 4. Digital Identity Intelligence (real: Hunter.io, HIBP, Numverify, DNS/Gravatar, perfiles públicos)
     if (include_digital) {
+      const [emailResult, phoneResult, usernameResult] = await Promise.all([
+        email ? enrichEmail(email) : Promise.resolve(null),
+        phone ? enrichPhone(phone) : Promise.resolve(null),
+        username ? discoverUsername(username) : Promise.resolve(null),
+      ])
+
       const di: any = {}
-      if (email) {
-        di.email = enrichEmail(email)
-        sourcesConsulted.push('HaveIBeenPwned', 'Hunter.io', 'DNS MX Records')
+      if (emailResult) {
+        di.email = emailResult
+        sourcesConsulted.push('DNS MX Records', 'Gravatar')
+        for (const s of emailResult.sources_available || []) if (!sourcesConsulted.includes(s)) sourcesConsulted.push(s)
+        for (const s of emailResult.sources_unavailable || []) sourcesUnavailable.push(s)
       }
-      if (phone) {
-        di.phone = enrichPhone(phone)
-        sourcesConsulted.push('NumVerify', 'Truecaller')
+      if (phoneResult) {
+        di.phone = phoneResult
+        trackSource('Numverify', !!phoneResult.available, phoneResult.message || phoneResult.error)
       }
-      if (username) {
-        di.username = discoverUsername(username)
-        sourcesConsulted.push('Sherlock', 'Maigret', 'WhatsMyName')
+      if (usernameResult) {
+        di.username = usernameResult
+        sourcesConsulted.push('GitHub', 'GitLab', 'Reddit', 'Dev.to', 'Stack Overflow (existencia pública)')
       }
       modules.digital_identity = di
 
       // 5. Digital Footprint
       modules.digital_footprint = calculateDigitalFootprint(di.email, di.username)
     }
+
+    // 5b. Motor de correlación de identidad (RENAPO vs. nombre declarado vs. señales digitales)
+    modules.identity_correlation = correlateIdentity(full_name, modules)
 
     // 6. Scoring
     const scores = calculateScores(modules)
@@ -100,10 +120,11 @@ export async function POST(request: Request) {
       )
     }
 
-    // 8. AI Report (simplified - generates structured report without external LLM)
+    // 8. AI Report (Claude API real con fallback determinístico)
     let aiReport = ''
     if (include_ai_report) {
-      aiReport = generateReport(full_name, modules, scores)
+      const fallback = generateReport(full_name, modules, scores)
+      aiReport = await generateAiNarrative(full_name, modules, scores, fallback)
     }
 
     // Save to database
@@ -161,6 +182,7 @@ export async function POST(request: Request) {
       breakdown: scores.breakdown,
       ai_report: aiReport,
       sources_consulted: sourcesConsulted,
+      sources_unavailable: sourcesUnavailable,
       created_at: check.createdAt.toISOString(),
     })
   } catch (error: any) {
@@ -191,7 +213,8 @@ function generateReport(name: string, modules: any, scores: any): string {
     lines.push(`La CURP presenta inconsistencias: ${modules.curp_validation.message}.`)
   }
   if (modules.rfc_validation?.is_valid) {
-    lines.push(`El RFC es válido y presenta estatus "${modules.rfc_validation.sat_status}" en SAT.`)
+    const satStatus = modules.government?.sat?.status
+    lines.push(`El RFC tiene formato válido${satStatus ? ` y presenta estatus "${satStatus}" en SAT.` : '.'}`)
   } else if (modules.rfc_validation) {
     lines.push(`El RFC presenta inconsistencias: ${modules.rfc_validation.message}.`)
   }
@@ -210,11 +233,16 @@ function generateReport(name: string, modules: any, scores: any): string {
   lines.push('## Inteligencia Digital')
   if (modules.digital_identity?.email) {
     const e = modules.digital_identity.email
-    lines.push(`Email: ${e.is_disposable ? 'DESECHEABLE (alerta)' : e.is_corporate_business ? 'Corporativo (positivo)' : 'Personal'}. ${e.breach_count} brechas de datos detectadas.`)
+    const breachInfo = typeof e.breach_count === 'number' ? `${e.breach_count} brechas de datos detectadas.` : 'brechas de datos no verificadas (HaveIBeenPwned no configurado).'
+    lines.push(`Email: ${e.is_disposable ? 'DESECHABLE (alerta)' : e.is_corporate_business ? 'Corporativo (positivo)' : 'Personal'}. ${breachInfo}`)
   }
   if (modules.digital_identity?.phone) {
     const p = modules.digital_identity.phone
-    lines.push(`Teléfono: ${p.carrier}, línea ${p.line_type}. ${p.is_spam_reported ? 'Reportado como spam (alerta).' : 'Sin reportes de spam.'}`)
+    if (p.available) {
+      lines.push(`Teléfono: ${p.carrier}, línea ${p.line_type}, ${p.is_valid ? 'válido' : 'inválido'} según Numverify.`)
+    } else {
+      lines.push('Teléfono: no verificado (Numverify no configurado).')
+    }
   }
   if (modules.digital_footprint) {
     const df = modules.digital_footprint

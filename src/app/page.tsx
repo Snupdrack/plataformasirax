@@ -64,12 +64,12 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     // Read from localStorage on mount - this is the only safe place
     const t = localStorage.getItem('sirax_token')
     const u = localStorage.getItem('sirax_user')
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- hidratación única desde localStorage al montar
     if (t) setToken(t)
     if (u) {
       try { setUser(JSON.parse(u)) } catch {}
     }
     setReady(true)
-    // eslint-disable-next-line react-hooks/set-state-in-effect
   }, [])
 
   const login = (t: string, u: User) => {
@@ -1270,9 +1270,9 @@ function DashboardView() {
     if (token) {
       API.get('/api/analytics/dashboard', token).then(d => { setData(d); setLoading(false) })
     } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- estado inicial de carga cuando no hay token
       setLoading(false)
     }
-    // eslint-disable-next-line react-hooks/set-state-in-effect
   }, [token])
 
   if (loading) return <div className="p-8"><div className="animate-pulse space-y-4"><div className="h-8 bg-slate-200 rounded w-64" /><div className="grid grid-cols-4 gap-5">{[1,2,3,4].map(i => <div key={i} className="h-32 bg-slate-200 rounded-lg" />)}</div></div></div>
@@ -1923,9 +1923,9 @@ function HistoryView() {
       if (riskFilter) params.set('risk_level', riskFilter)
       API.get(`/api/checks?${params.toString()}`, token).then(d => { setChecks(Array.isArray(d) ? d : []); setLoading(false) })
     } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- estado inicial de carga cuando no hay token
       setLoading(false)
     }
-    // eslint-disable-next-line react-hooks/set-state-in-effect
   }, [token, search, riskFilter])
 
   return (
@@ -2262,6 +2262,7 @@ export default function Home() {
     const savedView = (localStorage.getItem('sirax_view') || localStorage.getItem('synkdata_view')) as View | null
     const token = localStorage.getItem('sirax_token') || localStorage.getItem('synkdata_token')
     if (token && user) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- hidratación única de la vista al montar
       setView(savedView && savedView !== 'landing' && savedView !== 'login' && savedView !== 'register' ? savedView : 'dashboard')
     } else if (token && !user) {
       // Token exists but user not loaded yet - will be handled by auth provider
@@ -2270,17 +2271,16 @@ export default function Home() {
       setView('landing')
     }
     setMounted(true)
-    // eslint-disable-next-line react-hooks/set-state-in-effect
   }, [])
 
   // Also redirect when user changes after mount
   useEffect(() => {
     if (!mounted) return
     if (user && (view === 'landing' || view === 'login' || view === 'register')) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- redirección controlada tras cambio de sesión
       setView('dashboard')
       localStorage.setItem('sirax_view', 'dashboard')
     }
-    // eslint-disable-next-line react-hooks/set-state-in-effect
   }, [user, mounted, view])
 
   const navigate = useCallback((v: View, data?: any) => {
