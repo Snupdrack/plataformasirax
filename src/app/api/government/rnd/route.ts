@@ -9,6 +9,6 @@ export async function POST(request: Request) {
   if (!payload) return NextResponse.json({ error: 'Token inválido' }, { status: 401 })
 
   const { nombre, paterno, materno, estado } = await request.json()
-  const result = queryRnd(nombre, paterno, materno, estado)
+  const result = await queryRnd(nombre, paterno, materno, estado)
   return NextResponse.json(result)
 }

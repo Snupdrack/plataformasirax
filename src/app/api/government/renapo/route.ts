@@ -9,6 +9,6 @@ export async function POST(request: Request) {
   if (!payload) return NextResponse.json({ error: 'Token inválido' }, { status: 401 })
 
   const { curp, full_name } = await request.json()
-  const result = queryRenapo(curp, full_name)
+  const result = await queryRenapo(curp, full_name)
   return NextResponse.json(result)
 }

@@ -33,7 +33,7 @@ export async function GET(request: Request) {
 
   // Generate trend data for last 14 days
   const now = new Date()
-  const trend14Days = []
+  const trend14Days: { date: string; count: number }[] = []
   for (let i = 13; i >= 0; i--) {
     const d = new Date(now)
     d.setDate(d.getDate() - i)

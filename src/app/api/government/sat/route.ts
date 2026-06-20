@@ -9,6 +9,6 @@ export async function POST(request: Request) {
   if (!payload) return NextResponse.json({ error: 'Token inválido' }, { status: 401 })
 
   const { rfc } = await request.json()
-  const result = querySat(rfc)
+  const result = await querySat(rfc)
   return NextResponse.json(result)
 }

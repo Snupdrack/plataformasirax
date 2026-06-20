@@ -1,7 +1,24 @@
 // SynkData Identity Intelligence - Service Modules
-// Ported from Python backend with full algorithms
+// Validación algorítmica (CURP/RFC) + consultas reales a proveedores externos
+// (Nubarium, OpenSanctions, HaveIBeenPwned, Hunter.io, Numverify) + checks
+// reales sin API key (DNS MX, Gravatar, existencia de username).
+//
+// Todo lo que antes era data simulada (seededRandom) fue reemplazado por
+// llamadas reales. Si una API key no está configurada en .env, el módulo
+// correspondiente regresa `available: false` con un mensaje explícito en vez
+// de inventar datos — nunca se muestra data falsa como si fuera real.
 
-// ==================== CURP VALIDATION ====================
+import {
+  nubariumValidateCurp, nubariumValidateRfc, nubariumImssHistorial, nubariumScreenPep,
+} from './providers/nubarium'
+import { opensanctionsMatch } from './providers/opensanctions'
+import { hibpCheckBreaches } from './providers/hibp'
+import { hunterVerifyEmail } from './providers/hunter'
+import { numverifyValidatePhone } from './providers/numverify'
+import { checkUsernamePresence } from './providers/username-check'
+import { checkMxRecords, checkGravatar, isDisposableDomain } from './providers/email-checks'
+
+// ==================== CURP VALIDATION (algoritmo oficial) ====================
 
 const ESTADOS: Record<string, string> = {
   AS: 'AGUASCALIENTES', BC: 'BAJA CALIFORNIA', BS: 'BAJA CALIFORNIA SUR',
@@ -30,6 +47,8 @@ function validateCheckDigit(curp: string): boolean {
   return digitoCalculado === digitoCurp
 }
 
+// Validación puramente algorítmica (formato + dígito verificador). NO consulta
+// RENAPO — eso lo hace queryRenapo() por separado, que sí es una llamada real.
 export function validateCurp(curp: string, fullName?: string): any {
   curp = (curp || '').toUpperCase().trim()
 
@@ -67,10 +86,10 @@ export function validateCurp(curp: string, fullName?: string): any {
 
   return {
     is_valid: true,
-    message: 'CURP válido. Verificado contra algoritmo oficial.',
+    message: 'CURP con formato y dígito verificador válidos. Verificación contra RENAPO disponible en el módulo de gobierno.',
     curp,
     check_digit_valid: true,
-    renapo_match: true,
+    format_valid: true,
     components: {
       birth_date: birthDate.toISOString().split('T')[0],
       sex: sexo === 'H' ? 'Hombre' : 'Mujer',
@@ -82,21 +101,7 @@ export function validateCurp(curp: string, fullName?: string): any {
   }
 }
 
-// ==================== RFC VALIDATION ====================
-
-const REGIMENES_FISCALES: Record<string, string> = {
-  '601': 'General de Ley Personas Morales',
-  '603': 'Personas Morales con Fines no Lucrativos',
-  '605': 'Sueldos y Salarios e Ingresos Asimilados a Salarios',
-  '606': 'Arrendamiento',
-  '608': 'Demás ingresos',
-  '612': 'Personas Físicas con Actividades Empresariales y Profesionales',
-  '614': 'Ingresos por intereses',
-  '616': 'Sin obligaciones fiscales',
-  '621': 'Incorporación Fiscal',
-  '625': 'Régimen de las Actividades Empresariales con ingresos a través de Plataformas Tecnológicas',
-  '626': 'Régimen Simplificado de Confianza',
-}
+// ==================== RFC VALIDATION (algoritmo) ====================
 
 export function validateRfc(rfc: string): any {
   rfc = (rfc || '').toUpperCase().trim().replace(/[-\s]/g, '')
@@ -134,248 +139,159 @@ export function validateRfc(rfc: string): any {
 
   return {
     is_valid: true,
-    message: `RFC válido (${rfcType === 'fisica' ? 'Persona Física' : 'Persona Moral'})`,
+    message: `RFC con formato válido (${rfcType === 'fisica' ? 'Persona Física' : 'Persona Moral'}). Estatus real ante SAT disponible en el módulo de gobierno.`,
     rfc,
     type: rfcType,
     components: {
       date: dateObj.toISOString().split('T')[0],
       homoclave: rfc.slice(-3),
     },
-    sat_status: 'ACTIVO',
-    regimen_fiscal: rfcType === 'fisica'
-      ? '612 - Personas Físicas con Actividades Empesionales'
-      : '601 - General de Ley Personas Morales',
   }
 }
 
-// ==================== GOVERNMENT INTELLIGENCE ====================
+// ==================== GOVERNMENT INTELLIGENCE (consultas reales) ====================
 
-function seededRandom(seed: string): () => number {
-  let h = 0
-  for (let i = 0; i < seed.length; i++) {
-    h = ((h << 5) - h + seed.charCodeAt(i)) | 0
-  }
-  let s = Math.abs(h)
-  return () => {
-    s = (s * 16807 + 0) % 2147483647
-    return (s - 1) / 2147483646
-  }
-}
-
-export function queryRenapo(curp: string, fullName?: string): any {
+export async function queryRenapo(curp: string, fullName?: string): Promise<any> {
   if (!curp || curp.length !== 18) {
-    return { found: false, message: 'CURP no proporcionado o inválido', source: 'RENAPO' }
+    return { found: false, available: false, source: 'RENAPO', message: 'CURP no proporcionado o inválido' }
   }
-  const estadoCode = curp.substring(11, 13)
+  const result = await nubariumValidateCurp(curp)
+  if (!result.configured) {
+    return { found: false, available: false, source: 'RENAPO', message: result.error }
+  }
+  if (!result.ok) {
+    return { found: false, available: true, source: 'RENAPO', error: result.error }
+  }
+  if (!result.found) {
+    return { found: false, available: true, source: 'RENAPO', registry_status: 'NO_ENCONTRADO', message: result.message || 'CURP no encontrada en RENAPO' }
+  }
   return {
     found: true,
+    available: true,
     source: 'RENAPO',
     registry_status: 'VIGENTE',
-    data: {
-      curp,
-      registered_name: fullName || 'Nombre verificado en RENAPO',
-      birth_date: `19${curp.substring(4, 6)}-${curp.substring(6, 8)}-${curp.substring(8, 10)}`,
-      sex: curp[10] === 'H' ? 'HOMBRE' : 'MUJER',
-      nationality: 'MEXICANA',
-      state_birth: estadoCode,
-      document_status: 'ACTIVO',
-      last_update: '2024-11-15',
-    }
+    validation_id: result.validation_id,
+    data: result.data,
   }
 }
 
-export function querySat(rfc: string): any {
-  if (!rfc) return { found: false, source: 'SAT' }
-  const rng = seededRandom(rfc)
-  const statuses = ['ACTIVO', 'ACTIVO', 'ACTIVO', 'SUSPENDIDO']
-  const rfcType = rfc.length === 12 ? 'MORAL' : 'FISICA'
-  const statusIdx = Math.floor(rng() * statuses.length)
+export async function querySat(rfc: string): Promise<any> {
+  if (!rfc) return { found: false, available: false, source: 'SAT', message: 'RFC no proporcionado' }
+  const result = await nubariumValidateRfc(rfc)
+  if (!result.configured) {
+    return { found: false, available: false, source: 'SAT', message: result.error }
+  }
+  if (!result.ok) {
+    return { found: false, available: true, source: 'SAT', error: result.error }
+  }
+  if (!result.found) {
+    return { found: false, available: true, source: 'SAT', message: result.message || 'RFC no encontrado en SAT' }
+  }
   return {
     found: true,
+    available: true,
     source: 'SAT',
     rfc,
-    status: statuses[statusIdx],
-    type: rfcType,
-    regimen_fiscal: rfcType === 'FISICA'
-      ? '612 - Personas Físicas con Actividades Empresariales y Profesionales'
-      : '601 - General de Ley Personas Morales',
-    tax_obligations: [
-      'Declaración anual del ISR',
-      'Declaración mensual del IVA',
-      'Declaración informativa de operaciones con terceros',
-    ],
-    registered_date: '2018-03-22',
-    last_update: '2024-12-01',
+    status: result.data?.situacion_contribuyente || 'DESCONOCIDO',
+    data: result.data,
   }
 }
 
-export function queryImss(nss?: string, curp?: string): any {
-  if (!nss && !curp) return { found: false, source: 'IMSS' }
-  const rng = seededRandom((nss || curp!) + 'imss')
+export async function queryImss(nss?: string, curp?: string): Promise<any> {
+  if (!curp) {
+    return { found: false, available: false, source: 'IMSS', message: 'Se requiere CURP para consultar el historial laboral IMSS' }
+  }
+  const result = await nubariumImssHistorial(curp)
+  if (!result.configured) {
+    return { found: false, available: false, source: 'IMSS', message: result.error }
+  }
+  if (!result.ok) {
+    return { found: false, available: true, source: 'IMSS', error: result.error }
+  }
   return {
-    found: true,
+    found: result.found,
+    available: true,
     source: 'IMSS',
-    nss: nss || String(Math.floor(rng() * 9000000000 + 1000000000)),
-    status: rng() > 0.15 ? 'VIGENTE' : 'BAJA',
-    weeks_contributed: Math.floor(rng() * 1450 + 50),
-    current_employer_registered: rng() > 0.3,
-    authorized_info_only: true,
-    note: 'Información limitada según marco legal aplicable (LFT/LGSS).',
+    nss: result.nss || nss,
+    periodos_cotizados: result.periodos,
+    consent_required: result.consent_required,
+    consent_note: result.consent_note,
   }
 }
 
-export function queryRnd(nombre: string, paterno: string, materno?: string, estado?: string): any {
+// El Registro Nacional de Detenciones (RND) NO tiene API pública ni comercial.
+// El acceso está restringido por ley a instituciones de seguridad autorizadas
+// (Ley General del Sistema Nacional de Seguridad Pública, Art. 115-126). Ningún
+// proveedor KYC (Nubarium, NuFi, Belvo) lo ofrece. Este módulo se deja
+// honestamente deshabilitado en vez de simular resultados.
+export async function queryRnd(nombre: string, paterno: string, materno?: string, estado?: string): Promise<any> {
   const nombreCompleto = `${nombre} ${paterno} ${materno || ''}`.trim()
-  const rng = seededRandom(nombreCompleto + (estado || 'Nacional') + 'rnd')
-  const hasRecords = rng() < 0.05
-
-  if (!hasRecords) {
-    return {
-      found: false,
-      source: 'RND (SSPC)',
-      nombre_buscado: nombreCompleto,
-      estado: estado || 'Nacional',
-      sin_resultados: true,
-      message: 'Sin coincidencias en el Registro Nacional de Detenciones',
-    }
-  }
-
   return {
-    found: true,
+    found: false,
+    available: false,
     source: 'RND (SSPC)',
     nombre_buscado: nombreCompleto,
     estado: estado || 'Nacional',
-    sin_resultados: false,
-    records: [{
-      nombre: nombreCompleto.toUpperCase(),
-      lugar_detencion: `Calle Falsa 123, Col. Centro, ${estado || 'Nacional'}`,
-      fecha_hora: '2022-08-15 03:42',
-      autoridad_detiene: 'POLICIA MUNICIPAL',
-      autoridad_resguarda: 'MINISTERIO PUBLICO FEDERAL',
-      delito: 'FALTA ADMINISTRATIVA',
-      estatus: 'LIBERTAD',
-    }]
+    sin_resultados: true,
+    message: 'El Registro Nacional de Detenciones no expone API pública ni comercial. Solo instituciones de seguridad autorizadas tienen acceso (Ley General del Sistema Nacional de Seguridad Pública). Este módulo permanece deshabilitado por diseño.',
   }
 }
 
-// ==================== SANCTIONS SCREENING ====================
-
-const SANCTIONS_DB = [
-  { name: 'JOAQUIN ARCHIVALDO GUZMAN LOERA', list: 'OFAC SDN', program: 'SDNTK', country: 'MX', type: 'SDN', aliases: ['EL CHAPO', 'EL CHAPO GUZMAN'] },
-  { name: 'RAFAEL CARO QUINTERO', list: 'OFAC SDN', program: 'SDNTK', country: 'MX', type: 'SDN', aliases: ['NARCO DE NARCOS'] },
-  { name: 'VLADIMIR PUTIN', list: 'OFAC SDN', program: 'RUSSIA-EO14024', country: 'RU', type: 'SDN', aliases: ['VLADIMIR VLADIMIROVICH PUTIN'] },
-  { name: 'KIM JONG UN', list: 'OFAC SDN', program: 'DPRK', country: 'KP', type: 'SDN', aliases: [] },
-  { name: 'ABU BAKAR BASHIR', list: 'ONU Consolidated', program: 'ISIL/Al-Qaida', country: 'ID', type: 'TERRORIST', aliases: [] },
-  { name: 'ISMAEL ZAMBADA GARCIA', list: 'ONU Consolidated', program: 'Drug Trafficking', country: 'MX', type: 'SDN', aliases: ['EL MAYO'] },
-  { name: 'ANDRES MANUEL LOPEZ OBRADOR', list: 'PEP Database', program: 'Head of State', country: 'MX', type: 'PEP', aliases: ['AMLO'] },
-  { name: 'CLAUDIA SHEINBAUM PARDO', list: 'PEP Database', program: 'Head of State', country: 'MX', type: 'PEP', aliases: [] },
-  { name: 'MARCELO EBRARD CASAUBON', list: 'PEP Database', program: 'Cabinet Minister', country: 'MX', type: 'PEP', aliases: [] },
-  { name: 'ROSARIO ROBLES BERLANGA', list: 'PEP Database', program: 'Former Cabinet Minister', country: 'MX', type: 'PEP', aliases: [] },
-  { name: 'EMPRESA FANTASMA SA DE CV', list: 'SAT 69-B Definitivos', program: 'EFOS', country: 'MX', type: 'EFOS', aliases: [] },
-  { name: 'FACTURADORA APOCRIFA SA', list: 'SAT 69-B Definitivos', program: 'EFOS', country: 'MX', type: 'EFOS', aliases: [] },
-  { name: 'GENARO GARCIA LUNA', list: 'Interpol Red Notice', program: 'Money Laundering', country: 'MX', type: 'RED_NOTICE', aliases: [] },
-  { name: 'EMILIO LOZOYA AUSTIN', list: 'Interpol Red Notice', program: 'Corruption', country: 'MX', type: 'RED_NOTICE', aliases: [] },
-]
+// ==================== SANCTIONS SCREENING (OpenSanctions + Nubarium PEP) ====================
 
 export const ALL_LISTS = [
-  'OFAC SDN', 'ONU Consolidated List', 'OpenSanctions', 'PEP Database',
-  'SAT Lista 69-B', 'DOF', 'SCJN', 'Interpol Red Notices', 'EU Sanctions', 'UK HMT Sanctions',
+  'OFAC SDN', 'ONU Consolidated List', 'OpenSanctions', 'PEP Database (Nubarium)',
+  'EU Sanctions', 'UK HMT Sanctions', 'Interpol Red Notices',
 ]
 
-function normalize(s: string): string {
-  if (!s) return ''
-  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim()
-}
-
-function tokenSortRatio(a: string, b: string): number {
-  const tokensA = a.split(/\s+/).sort().join(' ')
-  const tokensB = b.split(/\s+/).sort().join(' ')
-  return similarity(tokensA, tokensB)
-}
-
-function partialRatio(a: string, b: string): number {
-  if (a.length <= b.length) return similarity(a, b)
-  return similarity(b, a)
-}
-
-function similarity(a: string, b: string): number {
-  if (a === b) return 100
-  if (!a || !b) return 0
-  const longer = a.length > b.length ? a : b
-  const shorter = a.length > b.length ? b : a
-  if (longer.length === 0) return 100
-  let best = 0
-  for (let i = 0; i <= longer.length - shorter.length; i++) {
-    let matches = 0
-    for (let j = 0; j < shorter.length; j++) {
-      if (shorter[j] === longer[i + j]) matches++
-    }
-    const score = (matches / longer.length) * 100
-    if (score > best) best = score
-  }
-  return Math.round(best)
-}
-
-export function screenSanctions(fullName: string, threshold = 80): any {
-  const target = normalize(fullName)
-  if (!target) {
-    return {
-      is_sanctioned: false,
-      is_pep: false,
-      matches: [],
-      lists_checked: ALL_LISTS,
-      total_records_screened: SANCTIONS_DB.length,
-    }
+export async function screenSanctions(fullName: string, threshold = 70): Promise<any> {
+  if (!fullName) {
+    return { available: false, is_sanctioned: false, is_pep: false, matches: [], lists_checked: ALL_LISTS }
   }
 
+  const [openSanctionsResult, nubariumPepResult] = await Promise.all([
+    opensanctionsMatch(fullName),
+    nubariumScreenPep(fullName),
+  ])
+
+  const sourcesAvailable: string[] = []
+  const sourcesUnavailable: string[] = []
   const matches: any[] = []
-  for (const entry of SANCTIONS_DB) {
-    const candidates = [entry.name, ...entry.aliases]
-    let bestScore = 0
-    let bestAlias = ''
-    for (const c of candidates) {
-      const score = Math.max(
-        tokenSortRatio(target, normalize(c)),
-        partialRatio(target, normalize(c))
-      )
-      if (score > bestScore) {
-        bestScore = score
-        bestAlias = c
-      }
+
+  if (openSanctionsResult.configured && openSanctionsResult.ok) {
+    sourcesAvailable.push('OpenSanctions (OFAC/ONU/EU/UK)')
+    for (const m of openSanctionsResult.matches) {
+      if (m.score >= threshold) matches.push({ ...m, provider: 'OpenSanctions' })
     }
-    if (bestScore >= threshold) {
-      matches.push({
-        list_name: entry.list,
-        matched_name: bestAlias,
-        official_name: entry.name,
-        score: bestScore,
-        program: entry.program,
-        country: entry.country,
-        type: entry.type,
-      })
-    }
+  } else {
+    sourcesUnavailable.push(`OpenSanctions: ${openSanctionsResult.error}`)
   }
 
-  matches.sort((a, b) => b.score - a.score)
-  const isSanctioned = matches.some(m => ['SDN', 'TERRORIST', 'RED_NOTICE', 'EFOS'].includes(m.type))
-  const isPep = matches.some(m => m.type === 'PEP')
+  if (nubariumPepResult.configured && nubariumPepResult.ok) {
+    sourcesAvailable.push('Nubarium PLD/PEP')
+    for (const m of nubariumPepResult.matches || []) {
+      matches.push({ ...m, provider: 'Nubarium' })
+    }
+  } else {
+    sourcesUnavailable.push(`Nubarium PEP: ${nubariumPepResult.error}`)
+  }
+
+  const isSanctioned = matches.some((m) => (m.topics || []).some((t: string) => ['sanction', 'debarment', 'crime'].includes(t)))
+  const isPep = matches.some((m) => (m.topics || []).includes('role.pep')) || !!nubariumPepResult.is_pep
 
   return {
+    available: sourcesAvailable.length > 0,
     is_sanctioned: isSanctioned,
     is_pep: isPep,
     matches,
     lists_checked: ALL_LISTS,
-    total_records_screened: SANCTIONS_DB.length,
+    sources_available: sourcesAvailable,
+    sources_unavailable: sourcesUnavailable,
     threshold_used: threshold,
   }
 }
 
-// ==================== DIGITAL IDENTITY ====================
-
-const DISPOSABLE_DOMAINS = new Set([
-  'tempmail.com', '10minutemail.com', 'guerrillamail.com', 'mailinator.com',
-  'throwawaymail.com', 'yopmail.com', 'fakemailgenerator.com', 'trashmail.com',
-])
+// ==================== DIGITAL IDENTITY (consultas reales) ====================
 
 const CORPORATE_DOMAINS: Record<string, [string, string]> = {
   'gmail.com': ['Google', 'consumer'],
@@ -386,138 +302,97 @@ const CORPORATE_DOMAINS: Record<string, [string, string]> = {
   'protonmail.com': ['Proton', 'privacy'],
 }
 
-const MX_CARRIERS = ['Telcel', 'AT&T México', 'Movistar', 'Bait', 'Virgin Mobile']
-const SOCIAL_PLATFORMS = [
-  'GitHub', 'GitLab', 'LinkedIn', 'X (Twitter)', 'Facebook', 'Instagram',
-  'Reddit', 'TikTok', 'Telegram', 'Discord', 'Medium', 'Dev.to',
-  'Stack Overflow', 'Behance', 'Dribbble',
-]
-
-export function enrichEmail(email: string): any {
+export async function enrichEmail(email: string): Promise<any> {
   if (!email || !email.includes('@')) return { is_valid: false, email }
 
-  const [local, domain] = email.toLowerCase().split('@')
-  const rng = seededRandom(email)
+  const [, domain] = email.toLowerCase().split('@')
 
-  const isDisposable = DISPOSABLE_DOMAINS.has(domain)
+  const [hunterResult, hibpResult, mxValid, hasGravatar] = await Promise.all([
+    hunterVerifyEmail(email),
+    hibpCheckBreaches(email),
+    checkMxRecords(domain),
+    checkGravatar(email),
+  ])
+
+  const isDisposable = isDisposableDomain(domain) || (hunterResult.configured && hunterResult.ok && hunterResult.is_disposable)
   const isCorporateConsumer = domain in CORPORATE_DOMAINS
   const isCorporateBusiness = !isCorporateConsumer && !isDisposable && domain.includes('.')
 
-  const breachCount = isDisposable
-    ? Math.floor(rng() * 13 + 3)
-    : Math.floor(rng() * 9)
-
-  const possibleBreaches = [
-    'LinkedIn (2021)', 'Adobe (2013)', 'Dropbox (2012)', 'Canva (2019)',
-    'Collection #1', 'MyHeritage (2018)', 'MyFitnessPal (2018)', 'Mexico Voter DB (2016)'
-  ]
-  const breachSources = breachCount > 0
-    ? possibleBreaches.slice(0, Math.min(breachCount, possibleBreaches.length))
-    : []
-
-  const hasGravatar = rng() > 0.6
-  const mxRecordsValid = !isDisposable
+  const sourcesAvailable: string[] = ['DNS MX Records', 'Gravatar']
+  const sourcesUnavailable: string[] = []
+  if (hunterResult.configured) sourcesAvailable.push('Hunter.io') ; else sourcesUnavailable.push(`Hunter.io: ${hunterResult.error}`)
+  if (hibpResult.configured) sourcesAvailable.push('HaveIBeenPwned') ; else sourcesUnavailable.push(`HaveIBeenPwned: ${hibpResult.error}`)
 
   let riskScore = 0
   if (isDisposable) riskScore += 60
-  if (breachCount >= 5) riskScore += 30
-  else if (breachCount >= 2) riskScore += 15
-  if (!mxRecordsValid) riskScore += 25
+  if (!mxValid) riskScore += 25
+  if (hibpResult.configured && hibpResult.ok && hibpResult.breach_count >= 5) riskScore += 30
+  else if (hibpResult.configured && hibpResult.ok && hibpResult.breach_count >= 2) riskScore += 15
   riskScore = Math.min(100, riskScore)
 
   return {
     email,
-    is_valid: true,
+    is_valid: hunterResult.configured && hunterResult.ok ? hunterResult.result !== 'undeliverable' : mxValid,
     domain,
     is_disposable: isDisposable,
     is_corporate_business: isCorporateBusiness,
     is_corporate_consumer: isCorporateConsumer,
     provider: CORPORATE_DOMAINS[domain]?.[0] || 'Custom Domain',
-    mx_records_valid: mxRecordsValid,
-    deliverable: mxRecordsValid,
-    breach_count: breachCount,
-    breach_sources: breachSources,
+    mx_records_valid: mxValid,
+    deliverable: hunterResult.configured && hunterResult.ok ? hunterResult.result === 'deliverable' : mxValid,
     has_gravatar: hasGravatar,
+    breach_count: hibpResult.configured && hibpResult.ok ? hibpResult.breach_count : null,
+    breach_sources: hibpResult.configured && hibpResult.ok ? hibpResult.breaches.map((b: any) => b.title) : [],
+    hunter_status: hunterResult.configured && hunterResult.ok ? hunterResult.status : null,
     risk_score: riskScore,
     risk_level: riskScore >= 60 ? 'ALTO' : riskScore >= 30 ? 'MEDIO' : 'BAJO',
-    sources: ['HaveIBeenPwned', 'Hunter.io', 'Gravatar', 'DNS MX Records'],
+    sources_available: sourcesAvailable,
+    sources_unavailable: sourcesUnavailable,
   }
 }
 
-export function enrichPhone(phone: string): any {
+export async function enrichPhone(phone: string): Promise<any> {
   if (!phone) return { is_valid: false, phone }
 
   const clean = phone.replace(/\D/g, '')
-  const rng = seededRandom(clean)
-
   if (clean.length < 10 || clean.length > 13) {
     return { is_valid: false, phone, message: 'Longitud inválida' }
   }
 
-  const countryCode = !clean.startsWith('1') ? '+52' : '+1'
-  const isMx = countryCode === '+52'
-  const carrier = isMx ? MX_CARRIERS[Math.floor(rng() * MX_CARRIERS.length)] : 'Unknown US Carrier'
-  const lineTypes = ['MOBILE', 'MOBILE', 'MOBILE', 'LANDLINE', 'VOIP']
-  const lineType = lineTypes[Math.floor(rng() * lineTypes.length)]
-  const isSpam = rng() < 0.08
+  const result = await numverifyValidatePhone(phone)
+  if (!result.configured) {
+    return { is_valid: null, phone, available: false, message: result.error }
+  }
+  if (!result.ok) {
+    return { is_valid: null, phone, available: true, error: result.error }
+  }
 
+  const lineType = (result.line_type || '').toLowerCase()
   let riskScore = 0
-  if (isSpam) riskScore += 60
-  if (lineType === 'VOIP') riskScore += 20
+  if (lineType === 'voip') riskScore += 20
+  if (!result.is_valid) riskScore += 30
   riskScore = Math.min(100, riskScore)
 
   return {
     phone,
-    is_valid: true,
-    country_code: countryCode,
-    country: isMx ? 'México' : 'Estados Unidos',
-    carrier,
-    line_type: lineType,
-    is_spam_reported: isSpam,
-    spam_reports: isSpam ? Math.floor(rng() * 750 + 50) : 0,
+    available: true,
+    is_valid: result.is_valid,
+    international_format: result.international_format,
+    local_format: result.local_format,
+    country_code: result.country_prefix,
+    country: result.country_name,
+    carrier: result.carrier || 'Desconocido',
+    line_type: result.line_type || 'DESCONOCIDO',
+    location: result.location,
     risk_score: riskScore,
     risk_level: riskScore >= 60 ? 'ALTO' : riskScore >= 30 ? 'MEDIO' : 'BAJO',
-    sources: ['NumVerify', 'Truecaller Reputation', 'ShouldIAnswer'],
+    sources_available: ['Numverify'],
   }
 }
 
-export function discoverUsername(username: string): any {
+export async function discoverUsername(username: string): Promise<any> {
   if (!username) return { username, found: false }
-
-  const rng = seededRandom(username.toLowerCase())
-  const foundCount = Math.floor(rng() * 8 + 2)
-  const shuffled = [...SOCIAL_PLATFORMS].sort(() => rng() - 0.5)
-  const foundPlatforms = shuffled.slice(0, foundCount)
-
-  const urlMap: Record<string, string> = {
-    'GitHub': `https://github.com/${username}`,
-    'GitLab': `https://gitlab.com/${username}`,
-    'LinkedIn': `https://linkedin.com/in/${username}`,
-    'X (Twitter)': `https://x.com/${username}`,
-    'Reddit': `https://reddit.com/user/${username}`,
-    'Instagram': `https://instagram.com/${username}`,
-    'TikTok': `https://tiktok.com/@${username}`,
-    'Telegram': `https://t.me/${username}`,
-    'Discord': `https://discord.com/users/${username}`,
-    'Medium': `https://medium.com/@${username}`,
-    'Dev.to': `https://dev.to/${username}`,
-    'Stack Overflow': `https://stackoverflow.com/users/${username}`,
-  }
-
-  const profiles = foundPlatforms.map(p => ({
-    platform: p,
-    url: urlMap[p] || `https://${p.toLowerCase().replace(/[\s()]/g, '')}.com/${username}`,
-    verified: rng() > 0.7,
-    last_active: `2025-${String(Math.floor(rng() * 12 + 1)).padStart(2, '0')}-${String(Math.floor(rng() * 28 + 1)).padStart(2, '0')}`,
-  }))
-
-  return {
-    username,
-    found: true,
-    profile_count: profiles.length,
-    profiles,
-    tools_used: ['Sherlock', 'Maigret', 'WhatsMyName'],
-  }
+  return checkUsernamePresence(username)
 }
 
 export function calculateDigitalFootprint(emailData?: any, usernameData?: any): any {
@@ -537,7 +412,7 @@ export function calculateDigitalFootprint(emailData?: any, usernameData?: any): 
     }
   }
 
-  const presenceScore = Math.min(100, socialProfiles.length * 9 + developerProfiles.length * 5 + (professionalPresence ? 15 : 0))
+  const presenceScore = Math.min(100, socialProfiles.length * 15 + developerProfiles.length * 8 + (professionalPresence ? 15 : 0))
 
   return {
     presence_score: presenceScore,
@@ -549,7 +424,7 @@ export function calculateDigitalFootprint(emailData?: any, usernameData?: any): 
   }
 }
 
-// ==================== RELATIONSHIP GRAPH ====================
+// ==================== RELATIONSHIP GRAPH (lógica pura, sin datos simulados) ====================
 
 function nodeId(prefix: string, value: string): string {
   let h = 0
@@ -603,8 +478,8 @@ export function buildRelationshipGraph(
 
   if (sanctionsMatches) {
     for (const m of sanctionsMatches.slice(0, 5)) {
-      const nid = nodeId('sanction', (m.official_name || '') + (m.list_name || ''))
-      nodes.push({ data: { id: nid, type: 'SanctionMatch', label: `${m.list_name}: ${m.matched_name}`, risk_level: 'CRITICO' } })
+      const nid = nodeId('sanction', (m.official_name || m.caption || '') + (m.list_name || m.provider || ''))
+      nodes.push({ data: { id: nid, type: 'SanctionMatch', label: `${m.provider || m.list_name}: ${m.caption || m.matched_name}`, risk_level: 'CRITICO' } })
       edges.push({ data: { source: personId, target: nid, relationship: 'MATCHED_IN' } })
     }
   }
@@ -632,7 +507,65 @@ export function buildRelationshipGraph(
   }
 }
 
-// ==================== RISK SCORING ====================
+// ==================== MOTOR DE CORRELACIÓN DE IDENTIDAD ====================
+// Compara el nombre declarado contra el nombre real devuelto por RENAPO y
+// contra cualquier señal de nombre disponible en las fuentes digitales ya
+// consultadas (no scrapea nada nuevo, solo correlaciona lo que ya se obtuvo).
+
+function normalizeName(s: string): string {
+  if (!s) return ''
+  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim().replace(/\s+/g, ' ')
+}
+
+function nameSimilarity(a: string, b: string): number {
+  const na = normalizeName(a)
+  const nb = normalizeName(b)
+  if (!na || !nb) return 0
+  if (na === nb) return 100
+  const tokensA = new Set(na.split(' '))
+  const tokensB = new Set(nb.split(' '))
+  let shared = 0
+  for (const t of tokensA) if (tokensB.has(t)) shared++
+  const union = new Set([...tokensA, ...tokensB]).size
+  return union === 0 ? 0 : Math.round((shared / union) * 100)
+}
+
+export function correlateIdentity(declaredName: string, modules: any): any {
+  const checks: any[] = []
+  const gov = modules.government || {}
+
+  if (gov.renapo?.available && gov.renapo?.found && gov.renapo.data) {
+    const renapoName = [gov.renapo.data.nombre, gov.renapo.data.apellido_paterno, gov.renapo.data.apellido_materno]
+      .filter(Boolean).join(' ')
+    const score = nameSimilarity(declaredName, renapoName)
+    checks.push({
+      check: 'Nombre declarado vs. RENAPO',
+      score,
+      consistent: score >= 70,
+      detail: `"${declaredName}" vs. "${renapoName}"`,
+    })
+  }
+
+  const digitalProfiles = modules.digital_footprint?.profiles || []
+  if (digitalProfiles.length > 0) {
+    checks.push({
+      check: 'Presencia digital corroborada',
+      score: Math.min(100, digitalProfiles.length * 20),
+      consistent: digitalProfiles.length > 0,
+      detail: `${digitalProfiles.length} perfil(es) público(s) verificado(s) (${digitalProfiles.map((p: any) => p.platform).join(', ')})`,
+    })
+  }
+
+  const overallConsistent = checks.length > 0 && checks.every((c) => c.consistent)
+  const anyInconsistent = checks.some((c) => !c.consistent)
+
+  return {
+    checks,
+    overall: checks.length === 0 ? 'SIN_DATOS_SUFICIENTES' : anyInconsistent ? 'INCONSISTENTE' : 'CONSISTENTE',
+  }
+}
+
+
 
 export function calculateScores(modules: any): any {
   let trust = 0
@@ -643,8 +576,8 @@ export function calculateScores(modules: any): any {
   const curpV = modules.curp_validation
   if (curpV) {
     if (curpV.is_valid) {
-      trust += 20
-      breakdown.trust_components.push({ label: 'CURP válido (RENAPO)', points: 20 })
+      trust += 15
+      breakdown.trust_components.push({ label: 'CURP con formato y dígito verificador válidos', points: 15 })
     } else {
       risk += 25
       breakdown.risk_components.push({ label: 'CURP inválida', points: 25 })
@@ -655,17 +588,8 @@ export function calculateScores(modules: any): any {
   const rfcV = modules.rfc_validation
   if (rfcV) {
     if (rfcV.is_valid) {
-      trust += 15
-      breakdown.trust_components.push({ label: 'RFC válido', points: 15 })
-      const satStatus = (rfcV.sat_status || '').toUpperCase()
-      if (satStatus === 'ACTIVO') {
-        trust += 15
-        breakdown.trust_components.push({ label: 'SAT activo', points: 15 })
-      } else if (satStatus === 'SUSPENDIDO') {
-        risk += 20
-        breakdown.risk_components.push({ label: 'RFC suspendido en SAT', points: 20 })
-        flags.push('RFC suspendido en SAT')
-      }
+      trust += 10
+      breakdown.trust_components.push({ label: 'RFC con formato válido', points: 10 })
     } else {
       risk += 15
       breakdown.risk_components.push({ label: 'RFC inválido', points: 15 })
@@ -674,24 +598,39 @@ export function calculateScores(modules: any): any {
 
   const gov = modules.government || {}
   const renapo = gov.renapo
-  if (renapo?.found && renapo.registry_status === 'VIGENTE') {
-    trust += 10
-    breakdown.trust_components.push({ label: 'Registro RENAPO vigente', points: 10 })
+  if (renapo?.available && renapo.found && renapo.registry_status === 'VIGENTE') {
+    trust += 15
+    breakdown.trust_components.push({ label: 'Registro RENAPO vigente (consulta real)', points: 15 })
+  }
+
+  const sat = gov.sat
+  if (sat?.available && sat.found) {
+    if (sat.status === 'ACTIVO') {
+      trust += 15
+      breakdown.trust_components.push({ label: 'SAT activo (consulta real)', points: 15 })
+    } else if (sat.status === 'SUSPENDIDO' || sat.status === 'CANCELADO') {
+      risk += 20
+      breakdown.risk_components.push({ label: `RFC con estatus ${sat.status} en SAT`, points: 20 })
+      flags.push(`RFC con estatus ${sat.status} en SAT`)
+    }
   }
 
   const rnd = gov.rnd
-  if (rnd && !rnd.sin_resultados && rnd.found) {
-    risk += 60
-    breakdown.risk_components.push({ label: 'Registro en RND (Detenciones)', points: 60 })
-    flags.push('Detención registrada en el Registro Nacional de Detenciones')
+  if (rnd?.available) {
+    // Solo se considera en el score si el módulo está realmente disponible.
+    if (!rnd.sin_resultados && rnd.found) {
+      risk += 60
+      breakdown.risk_components.push({ label: 'Registro en RND (Detenciones)', points: 60 })
+      flags.push('Detención registrada en el Registro Nacional de Detenciones')
+    }
   }
 
   const sanc = modules.sanctions
-  if (sanc) {
+  if (sanc?.available) {
     if (sanc.is_sanctioned) {
       risk = 100
       breakdown.risk_components.push({ label: 'Match en lista de sanciones', points: 100 })
-      flags.push('Coincidencia en listas de sanciones (OFAC/ONU/Interpol)')
+      flags.push('Coincidencia en listas de sanciones (OFAC/ONU/OpenSanctions)')
     } else if (sanc.is_pep) {
       risk += 25
       breakdown.risk_components.push({ label: 'Persona Expuesta Políticamente (PEP)', points: 25 })
@@ -713,17 +652,23 @@ export function calculateScores(modules: any): any {
       trust += 5
       breakdown.trust_components.push({ label: 'Email corporativo propio', points: 5 })
     }
-    if (email.breach_count >= 5) {
+    if (typeof email.breach_count === 'number' && email.breach_count >= 5) {
       risk += 15
-      breakdown.risk_components.push({ label: `${email.breach_count} brechas de datos`, points: 15 })
+      breakdown.risk_components.push({ label: `${email.breach_count} brechas de datos (HaveIBeenPwned)`, points: 15 })
     }
   }
 
   const phoneData = di.phone
-  if (phoneData?.is_spam_reported) {
-    risk += 15
-    breakdown.risk_components.push({ label: 'Teléfono reportado como spam', points: 15 })
-    flags.push('Teléfono con reportes de spam')
+  if (phoneData?.available) {
+    if (phoneData.line_type === 'voip') {
+      risk += 10
+      breakdown.risk_components.push({ label: 'Teléfono VOIP', points: 10 })
+    }
+    if (phoneData.is_valid === false) {
+      risk += 15
+      breakdown.risk_components.push({ label: 'Teléfono inválido', points: 15 })
+      flags.push('Teléfono inválido según Numverify')
+    }
   }
 
   const df = modules.digital_footprint
@@ -738,8 +683,18 @@ export function calculateScores(modules: any): any {
     }
     if (df.developer_profiles_count > 0) {
       trust += 5
-      breakdown.trust_components.push({ label: 'Perfiles de desarrollador (GitHub)', points: 5 })
+      breakdown.trust_components.push({ label: 'Perfiles de desarrollador (GitHub/GitLab)', points: 5 })
     }
+  }
+
+  const correlation = modules.identity_correlation
+  if (correlation?.overall === 'CONSISTENTE') {
+    trust += 10
+    breakdown.trust_components.push({ label: 'Nombre declarado consistente con RENAPO y huella digital', points: 10 })
+  } else if (correlation?.overall === 'INCONSISTENTE') {
+    risk += 20
+    breakdown.risk_components.push({ label: 'Inconsistencia entre nombre declarado y fuentes verificadas', points: 20 })
+    flags.push('El nombre declarado no coincide con los registros verificados')
   }
 
   trust = Math.max(0, Math.min(100, trust))
@@ -748,11 +703,11 @@ export function calculateScores(modules: any): any {
   const signalsValidated = [
     !!(curpV?.is_valid),
     !!(rfcV?.is_valid),
-    !!(renapo?.found),
+    !!(renapo?.available && renapo.found),
     !!(email && !email.is_disposable && email.is_valid),
-    !!(phoneData?.is_valid && !phoneData.is_spam_reported),
+    !!(phoneData?.available && phoneData.is_valid),
     !!(df?.presence_score >= 40),
-    !!(sanc && !sanc.is_sanctioned),
+    !!(sanc?.available && !sanc.is_sanctioned),
   ].filter(Boolean).length
 
   const identityConfidence = Math.round(Math.min(100, signalsValidated * 14 + (trust >= 60 ? 10 : 0)))

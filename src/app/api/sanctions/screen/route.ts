@@ -9,6 +9,6 @@ export async function POST(request: Request) {
   if (!payload) return NextResponse.json({ error: 'Token inválido' }, { status: 401 })
 
   const { full_name, threshold } = await request.json()
-  const result = screenSanctions(full_name, threshold)
+  const result = await screenSanctions(full_name, threshold)
   return NextResponse.json(result)
 }
