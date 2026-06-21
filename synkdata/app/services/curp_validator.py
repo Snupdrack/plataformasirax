@@ -241,7 +241,22 @@ class CurpValidatorService:
             return result
 
         try:
-            renapo_data = await self._call_renapo_api(curp_upper)
+            # Intentar Nubarium primero
+            renapo_data = await self._call_nubarium_curp(curp_upper)
+            
+            # Si Nubarium falla o no encuentra, intentar APIMarket (fallback)
+            if not renapo_data:
+                logger.info("Nubarium no encontró datos para %s, intentando fallback APIMarket...", curp_upper)
+                renapo_data = await self._call_apimarket_curp(curp_upper)
+                
+                # Si APIMarket falla, intentar Maigret
+                if not renapo_data:
+                    renapo_data = await self._call_maigret_curp(curp_upper)
+                    
+                    # Como último recurso, intentar RENAPO directo (si estuviera configurado)
+                    if not renapo_data:
+                        renapo_data = await self._call_renapo_api(curp_upper)
+
             result.renapo_match = renapo_data is not None
 
             if renapo_data:
@@ -410,8 +425,67 @@ class CurpValidatorService:
             logger.warning("Error almacenando en caché CURP: %s", exc)
 
     # -----------------------------------------------------------------------
+    # Métodos de fallback (APIMarket, Maigret)
+    # -----------------------------------------------------------------------
+
+    async def _call_apimarket_curp(self, curp: str) -> Optional[Dict[str, Any]]:
+        """Fallback: Consulta CURP en APIMarket."""
+        if not self._settings.APIMARKET_API_KEY:
+            return None
+        
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(
+                    f"{self._settings.APIMARKET_API_URL}/curp/{curp}",
+                    headers={"Authorization": f"Bearer {self._settings.APIMARKET_API_KEY}"}
+                )
+                if response.status_code == 200:
+                    logger.info("CURP %s validada exitosamente vía APIMarket", curp)
+                    return response.json()
+        except Exception as exc:
+            logger.error("Error consultando APIMarket para CURP %s: %s", curp, exc)
+        return None
+
+    async def _call_maigret_curp(self, curp: str) -> Optional[Dict[str, Any]]:
+        """Fallback: Consulta CURP en Maigret (búsqueda de identidad)."""
+        if not self._settings.MAIGRET_API_URL:
+            return None
+            
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                response = await client.get(
+                    f"{self._settings.MAIGRET_API_URL}/curp/{curp}"
+                )
+                if response.status_code == 200:
+                    logger.info("Información de CURP %s obtenida vía Maigret", curp)
+                    return response.json()
+        except Exception as exc:
+            logger.debug("Maigret CURP no disponible: %s", exc)
+        return None
+
+    # -----------------------------------------------------------------------
     # Métodos de integración con RENAPO
     # -----------------------------------------------------------------------
+
+    async def _call_nubarium_curp(self, curp: str) -> Optional[Dict[str, Any]]:
+        """Consulta CURP en Nubarium."""
+        if not self._settings.NUBARIUM_USER or not self._settings.NUBARIUM_PASSWORD:
+            return None
+        
+        try:
+            async with httpx.AsyncClient(timeout=self._settings.NUBARIUM_TIMEOUT) as client:
+                response = await client.post(
+                    self._settings.NUBARIUM_CURP_URL,
+                    auth=(self._settings.NUBARIUM_USER, self._settings.NUBARIUM_PASSWORD),
+                    json={"curp": curp, "documento": "0"}
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get("success"):
+                        return data.get("data")
+        except Exception as exc:
+            logger.error("Error consultando Nubarium para CURP %s: %s", curp, exc)
+        return None
 
     async def _call_renapo_api(self, curp: str) -> Optional[Dict[str, Any]]:
         """

@@ -196,6 +196,44 @@ class SocialDiscoveryService:
         if username:
             tasks.append(self.search_github(username))
 
+        # ── Dorks de SerpApi ─────────────────────────────────────────────
+        if self._settings.SERPAPI_API_KEY:
+            # 1. Localización de Antecedentes Legales y Boletines Judiciales
+            tasks.append(self.search_google_dorks(f'"{name}" filetype:pdf site:gob.mx', "legal"))
+            tasks.append(self.search_google_dorks(f'"{name}" (intext:"demandado" | intext:"actor" | intext:"juicio" | intext:"sentencia")', "legal"))
+            tasks.append(self.search_google_dorks(f'site:buholegal.com | site:poderjudicial.gob.mx "{name}"', "legal"))
+
+            # 2. Dorks para Identificación de Fraude y Listas de Riesgo
+            tasks.append(self.search_google_dorks(f'"{name}" (intext:"fraude" | intext:"estafa" | intext:"scam" | intext:"queja" | intext:"blacklist")', "fraud"))
+            if email:
+                tasks.append(self.search_google_dorks(f'intext:"{email}" (intext:"leak" | intext:"dump" | intext:"password" | intext:"database")', "leak"))
+
+            # 3. Verificación de Estructura Corporativa
+            tasks.append(self.search_google_dorks(f'site:anunciosjudiciales.gob.mx | site:siger.economia.gob.mx "{name}"', "corporate"))
+            tasks.append(self.search_google_dorks(f'"{name}" "S.A. de C.V." | "S. de R.L." filetype:pdf', "corporate"))
+
+            # 4. Exposición de Datos Expuestos (Leakage)
+            tasks.append(self.search_google_dorks(f'filetype:xls | filetype:xlsx | filetype:csv "{name}" (intext:"KYC" | intext:"usuarios" | intext:"fraude")', "leak"))
+
+            # 5. Dorks para Redes Sociales
+            if email:
+                tasks.append(self.search_google_dorks(f'site:facebook.com | site:instagram.com | site:x.com | site:linkedin.com "{email}"', "social_leak"))
+            if phone:
+                tasks.append(self.search_google_dorks(f'site:facebook.com | site:instagram.com | site:x.com | site:linkedin.com "{phone}"', "social_leak"))
+            if username:
+                tasks.append(self.search_google_dorks(f'site:instagram.com | site:tiktok.com | site:x.com "{username}"', "social"))
+
+            # 6. Dorks de Redes Sociales + Alertas de Fraude
+            if phone:
+                tasks.append(self.search_google_dorks(f'site:facebook.com "{phone}" (intext:"fraude" | intext:"estafa" | intext:"robo" | intext:"falso" | intext:"alerta")', "fraud"))
+            if email:
+                tasks.append(self.search_google_dorks(f'site:x.com "{email}" (intext:"hilo" | intext:"fraude" | intext:"scam" | intext:"cuidado")', "fraud"))
+
+            # 7. Bases de Datos de Spam y Reportes Telefónicos
+            if phone:
+                tasks.append(self.search_google_dorks(f'site:listaspam.com | site:quienhabla.com | site:teledigo.com | site:responderono.com "{phone}"', "spam_report"))
+                tasks.append(self.search_google_dorks(f'intext:"{phone}" (site:reddit.com | site:apestan.com | site:complaintsboard.com) "fraude"', "fraud"))
+
         # ── Ejecutar búsquedas en paralelo ───────────────────────────────
         search_results = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -208,6 +246,17 @@ class SocialDiscoveryService:
                         result.linkedin_profiles.append(item)
             elif isinstance(search_result, GitHubProfile):
                 result.github_profile = search_result
+            elif isinstance(search_result, list) and len(search_result) > 0 and isinstance(search_result[0], dict) and search_result[0].get("source") == "Google (via SerpApi)":
+                # Resultados de SerpApi
+                for res in search_result:
+                    category = res.get("category", "social")
+                    result.social_profiles.append({
+                        "platform": "Google Search",
+                        "name": res.get("title"),
+                        "url": res.get("link"),
+                        "snippet": res.get("snippet"),
+                        "category": category,
+                    })
             else:
                 logger.debug("Resultado de búsqueda inesperado: %s", type(search_result))
 
@@ -406,6 +455,72 @@ class SocialDiscoveryService:
                 logger.debug("No se pudo cachear resultado de LinkedIn para %s", name)
 
         return profiles
+
+    # ── Búsqueda en Google (SerpApi) ────────────────────────────────────
+    async def search_google_dorks(
+        self,
+        query: str,
+        category: str = "general",
+    ) -> List[Dict[str, Any]]:
+        """
+        Realiza una búsqueda avanzada en Google usando SerpApi.
+
+        Args:
+            query: La consulta de búsqueda (Dork) completa.
+            category: Categoría de la búsqueda para clasificación.
+
+        Returns:
+            List[Dict[str, Any]]: Lista de resultados encontrados.
+        """
+        if not self._settings.SERPAPI_API_KEY:
+            logger.debug("SerpApi API key no configurada.")
+            return []
+
+        cache_key = f"digital:social:serpapi:{hash(query)}"
+        try:
+            redis = get_redis()
+            cached = await redis.get(cache_key)
+            if cached:
+                return json.loads(cached)
+        except Exception:
+            pass
+
+        results = []
+        try:
+            async with httpx.AsyncClient(timeout=self._http_timeout) as client:
+                response = await client.get(
+                    self._settings.SERPAPI_API_URL,
+                    params={
+                        "q": query,
+                        "api_key": self._settings.SERPAPI_API_KEY,
+                        "engine": "google",
+                        "num": 10,
+                    },
+                )
+
+                if response.status_code == 200:
+                    data = response.json()
+                    organic_results = data.get("organic_results", [])
+                    for res in organic_results:
+                        results.append({
+                            "title": res.get("title"),
+                            "link": res.get("link"),
+                            "snippet": res.get("snippet"),
+                            "source": "Google (via SerpApi)",
+                            "category": category,
+                        })
+
+                    # Cachear
+                    if results:
+                        try:
+                            redis = get_redis()
+                            await redis.setex(cache_key, self._cache_ttl, json.dumps(results))
+                        except Exception:
+                            pass
+        except Exception as exc:
+            logger.error("Error en SerpApi search para query '%s': %s", query, exc)
+
+        return results
 
     # ── Búsqueda en GitHub ───────────────────────────────────────────────
     async def search_github(self, username: str) -> GitHubProfile:

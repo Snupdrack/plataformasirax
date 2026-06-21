@@ -297,9 +297,19 @@ class RfcValidatorService:
             except (json.JSONDecodeError, TypeError):
                 pass
 
-        # Consultar SAT
+        # Consultar proveedores
         try:
-            sat_data = await self._call_sat_api(rfc_upper)
+            # Intentar Nubarium primero
+            sat_data = await self._call_nubarium_rfc(rfc_upper)
+
+            # Si Nubarium falla o no encuentra, intentar fallback con APIMarket
+            if not sat_data:
+                logger.info("Nubarium no encontró datos para RFC %s, intentando fallback APIMarket...", rfc_upper)
+                sat_data = await self._call_apimarket_rfc(rfc_upper)
+                
+                # Si APIMarket falla, intentar SAT directo (si estuviera configurado)
+                if not sat_data:
+                    sat_data = await self._call_sat_api(rfc_upper)
 
             if sat_data:
                 status_value = sat_data.get("estado", "desconocido")
@@ -487,8 +497,50 @@ class RfcValidatorService:
             logger.warning("Error almacenando en caché RFC: %s", exc)
 
     # -----------------------------------------------------------------------
+    # Métodos de fallback (APIMarket)
+    # -----------------------------------------------------------------------
+
+    async def _call_apimarket_rfc(self, rfc: str) -> Optional[Dict[str, Any]]:
+        """Fallback: Consulta RFC en APIMarket."""
+        if not self._settings.APIMARKET_API_KEY:
+            return None
+        
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(
+                    f"{self._settings.APIMARKET_API_URL}/rfc/{rfc}",
+                    headers={"Authorization": f"Bearer {self._settings.APIMARKET_API_KEY}"}
+                )
+                if response.status_code == 200:
+                    logger.info("RFC %s validado exitosamente vía APIMarket", rfc)
+                    return response.json()
+        except Exception as exc:
+            logger.error("Error consultando APIMarket para RFC %s: %s", rfc, exc)
+        return None
+
+    # -----------------------------------------------------------------------
     # Métodos de integración con el SAT
     # -----------------------------------------------------------------------
+
+    async def _call_nubarium_rfc(self, rfc: str) -> Optional[Dict[str, Any]]:
+        """Consulta RFC en Nubarium."""
+        if not self._settings.NUBARIUM_USER or not self._settings.NUBARIUM_PASSWORD:
+            return None
+        
+        try:
+            async with httpx.AsyncClient(timeout=self._settings.NUBARIUM_TIMEOUT) as client:
+                response = await client.post(
+                    self._settings.NUBARIUM_RFC_URL,
+                    auth=(self._settings.NUBARIUM_USER, self._settings.NUBARIUM_PASSWORD),
+                    json={"rfc": rfc}
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get("success"):
+                        return data.get("data")
+        except Exception as exc:
+            logger.error("Error consultando Nubarium para RFC %s: %s", rfc, exc)
+        return None
 
     async def _call_sat_api(self, rfc: str) -> Optional[Dict[str, Any]]:
         """

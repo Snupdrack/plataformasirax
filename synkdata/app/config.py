@@ -133,6 +133,18 @@ class Settings(BaseSettings):
     NEO4J_CONNECTION_TIMEOUT: int = 30
 
     # ── APIs externas — Gobierno de México ────────────────────────────────
+    NUBARIUM_USER: str = Field(
+        default="",
+        description="Usuario para el servicio de Nubarium.",
+    )
+    NUBARIUM_PASSWORD: str = Field(
+        default="",
+        description="Contraseña para el servicio de Nubarium.",
+    )
+    NUBARIUM_CURP_URL: str = "https://curp.nubarium.com/renapo/v2/valida_curp"
+    NUBARIUM_RFC_URL: str = "https://rfc.nubarium.com/sat/v2/valida_rfc"
+    NUBARIUM_TIMEOUT: int = 20
+
     RENAPO_API_KEY: str = Field(
         default="",
         description="Clave API para el servicio de validación RENAPO (CURP).",
@@ -167,6 +179,28 @@ class Settings(BaseSettings):
     INTERPOL_API_URL: str = "https://ws-public.interpol.int/notices/v1"
 
     # ── APIs externas — Verificación de identidad digital ─────────────────
+    SERPAPI_API_KEY: str = Field(
+        default="",
+        description="Clave API para SerpApi (Google Search Dorks).",
+    )
+    SERPAPI_API_URL: str = "https://serpapi.com/search"
+
+    APIMARKET_API_KEY: str = Field(
+        default="",
+        description="Clave API para APIMarket (fallback para CURP/RFC).",
+    )
+    APIMARKET_API_URL: str = "https://api.apimarket.mx/v1"
+
+    MAIGRET_PATH: str = Field(
+        default="maigret",
+        description="Ruta al binario o comando de Maigret.",
+    )
+
+    SHERLOCK_PATH: str = Field(
+        default="sherlock",
+        description="Ruta al binario o comando de Sherlock.",
+    )
+
     HIBP_API_KEY: str = Field(
         default="",
         description="Clave API para Have I Been Pwned (verificación de correo).",

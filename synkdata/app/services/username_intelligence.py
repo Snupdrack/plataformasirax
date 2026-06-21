@@ -630,6 +630,85 @@ class UsernameIntelligenceService:
         self._cache_ttl = self._settings.REDIS_CACHE_TTL
         self._semaphore = asyncio.Semaphore(self.MAX_CONCURRENT_CHECKS)
 
+    # ── Integración con Sherlock y Maigret (Comandos Locales) ──────────
+    async def _search_external_tools(
+        self,
+        username: str,
+    ) -> List[PlatformProfile]:
+        """
+        Consulta herramientas externas como Sherlock y Maigret vía línea de comandos.
+        """
+        import os
+        import tempfile
+        
+        external_profiles: List[PlatformProfile] = []
+        
+        # ── Ejecutar Sherlock ───────────────────────────────────────────
+        if self._settings.SHERLOCK_PATH:
+            try:
+                logger.debug("Ejecutando Sherlock para: %s", username)
+                process = await asyncio.create_subprocess_exec(
+                    self._settings.SHERLOCK_PATH,
+                    username,
+                    "--timeout", "10",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE
+                )
+                stdout, _ = await process.communicate()
+                
+                if process.returncode == 0:
+                    output = stdout.decode().splitlines()
+                    for line in output:
+                        if "http" in line and "[:]" not in line:
+                            parts = line.split(": ")
+                            if len(parts) >= 2:
+                                platform = parts[0].strip().replace("[+]", "").strip()
+                                url = parts[1].strip()
+                                external_profiles.append(PlatformProfile(
+                                    platform=f"{platform} (Sherlock)",
+                                    url=url,
+                                    exists=True,
+                                    category=PlatformCategory.SOCIAL,
+                                ))
+            except Exception as exc:
+                logger.debug("Error ejecutando Sherlock localmente: %s", exc)
+
+        # ── Ejecutar Maigret ───────────────────────────────────────────
+        if self._settings.MAIGRET_PATH:
+            try:
+                logger.debug("Ejecutando Maigret para: %s", username)
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    process = await asyncio.create_subprocess_exec(
+                        self._settings.MAIGRET_PATH,
+                        username,
+                        "--timeout", "10",
+                        "--unstable",
+                        "--no-extract",
+                        "--json", "simple",
+                        cwd=tmpdir,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE
+                    )
+                    await process.communicate()
+                    
+                    report_path = os.path.join(tmpdir, f"report_{username}.json")
+                    if os.path.exists(report_path):
+                        with open(report_path, "r", encoding="utf-8") as f:
+                            data = json.load(f)
+                            for site_name, site_data in data.get("sites", {}).items():
+                                if site_data.get("status") == "claimed":
+                                    external_profiles.append(PlatformProfile(
+                                        platform=f"{site_name} (Maigret)",
+                                        url=site_data.get("url_user"),
+                                        exists=True,
+                                        category=PlatformCategory.SOCIAL,
+                                        profile_data=site_data,
+                                    ))
+            except Exception as exc:
+                logger.debug("Error ejecutando Maigret localmente: %s", exc)
+
+        return external_profiles
+
     # ── Método principal ─────────────────────────────────────────────────
     async def analyze(self, username: str) -> UsernameIntelligenceResult:
         """
@@ -670,6 +749,10 @@ class UsernameIntelligenceService:
 
         # ── Buscar perfiles en todas las plataformas ─────────────────────
         profiles = await self.search_platforms(username)
+
+        # ── Consultar herramientas externas (Sherlock/Maigret) ────────────
+        external_profiles = await self._search_external_tools(username)
+        profiles.extend(external_profiles)
 
         # ── Filtrar solo perfiles existentes ─────────────────────────────
         existing_profiles = [p for p in profiles if p.exists]
