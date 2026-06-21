@@ -50,7 +50,7 @@
 }
 
 :root {
-  --radius: 0.625rem;
+  --radius: 0.75rem;
 
   /* Sirax brand palette */
   --sirax-navy: #0a192f;
@@ -60,109 +60,66 @@
   --sirax-teal-bright: #2ee8b8;
   --sirax-teal-soft: rgba(0, 209, 160, 0.12);
 
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-}
-
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  /* === DARK-TECH THEME (always dark, matching siraxlanding) === */
+  --background: oklch(0.07 0.012 250);
+  --foreground: oklch(0.97 0.005 250);
+  --card: oklch(0.11 0.015 250);
+  --card-foreground: oklch(0.97 0.005 250);
+  --popover: oklch(0.10 0.015 250);
+  --popover-foreground: oklch(0.97 0.005 250);
+  --primary: oklch(0.78 0.16 195);
+  --primary-foreground: oklch(0.10 0.02 230);
+  --secondary: oklch(0.16 0.02 250);
+  --secondary-foreground: oklch(0.95 0.005 250);
+  --muted: oklch(0.16 0.015 250);
+  --muted-foreground: oklch(0.65 0.01 250);
+  --accent: oklch(0.78 0.16 195);
+  --accent-foreground: oklch(0.10 0.02 230);
+  --destructive: oklch(0.65 0.22 22);
+  --border: oklch(1 0 0 / 8%);
+  --input: oklch(1 0 0 / 8%);
+  --ring: oklch(0.78 0.16 195 / 60%);
+  --chart-1: oklch(0.78 0.16 195);
+  --chart-2: oklch(0.72 0.18 150);
+  --chart-3: oklch(0.65 0.20 280);
+  --chart-4: oklch(0.78 0.16 60);
+  --chart-5: oklch(0.70 0.20 350);
+  --sidebar: oklch(0.09 0.013 250);
+  --sidebar-foreground: oklch(0.97 0.005 250);
+  --sidebar-primary: oklch(0.78 0.16 195);
+  --sidebar-primary-foreground: oklch(0.10 0.02 230);
+  --sidebar-accent: oklch(0.14 0.018 250);
+  --sidebar-accent-foreground: oklch(0.97 0.005 250);
+  --sidebar-border: oklch(1 0 0 / 8%);
+  --sidebar-ring: oklch(0.78 0.16 195 / 60%);
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    scroll-behavior: smooth;
+  }
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "ss01", "cv11";
+    background-color: var(--background);
   }
 }
 
 /* ==================== Sirax brand utilities ==================== */
-.bg-sirax-navy {
-  background-color: var(--sirax-navy);
-}
-.bg-sirax-navy-soft {
-  background-color: var(--sirax-navy-soft);
-}
-.bg-sirax-navy-line {
-  background-color: var(--sirax-navy-line);
-}
-.text-sirax-teal {
-  color: var(--sirax-teal);
-}
-.text-sirax-teal-bright {
-  color: var(--sirax-teal-bright);
-}
-.bg-sirax-teal {
-  background-color: var(--sirax-teal);
-}
-.border-sirax-teal {
-  border-color: var(--sirax-teal);
-}
-.ring-sirax-teal {
-  --tw-ring-color: var(--sirax-teal);
-}
+.bg-sirax-navy { background-color: var(--sirax-navy); }
+.bg-sirax-navy-soft { background-color: var(--sirax-navy-soft); }
+.bg-sirax-navy-line { background-color: var(--sirax-navy-line); }
+.text-sirax-teal { color: var(--sirax-teal); }
+.text-sirax-teal-bright { color: var(--sirax-teal-bright); }
+.bg-sirax-teal { background-color: var(--sirax-teal); }
+.border-sirax-teal { border-color: var(--sirax-teal); }
+.ring-sirax-teal { --tw-ring-color: var(--sirax-teal); }
+.text-sirax-navy { color: var(--sirax-navy); }
 
-/* Sirax wordmark — square dot on the "i", teal diagonal on the "x" */
+/* Sirax wordmark */
 .sirax-wordmark {
   font-weight: 800;
   letter-spacing: -0.04em;
@@ -180,44 +137,94 @@
   position: relative;
   top: -0.05em;
 }
-.sirax-wordmark .x-teal {
-  color: var(--sirax-teal);
-}
+.sirax-wordmark .x-teal { color: var(--sirax-teal); }
 
-/* Subtle grid pattern for hero */
-.sirax-grid {
+/* === Copied from siraxlanding === */
+.sirax-grid-bg {
   background-image:
-    linear-gradient(rgba(0, 209, 160, 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 209, 160, 0.06) 1px, transparent 1px);
+    linear-gradient(to right, rgba(255,255,255,0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,0.04) 1px, transparent 1px);
   background-size: 56px 56px;
-  -webkit-mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
-  mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+}
+.sirax-radial-mask {
+  -webkit-mask-image: radial-gradient(ellipse at center, #000 30%, transparent 75%);
+  mask-image: radial-gradient(ellipse at center, #000 30%, transparent 75%);
+}
+.sirax-text-gradient {
+  background: linear-gradient(120deg, #fff 0%, #7be0ff 45%, #4bd6c5 75%, #fff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.sirax-card-glow {
+  position: relative;
+}
+.sirax-card-glow::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(123,224,255,0.35), rgba(75,214,197,0.05) 50%, transparent 80%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+.sirax-glass {
+  background: rgba(255,255,255,0.025);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255,255,255,0.07);
 }
 
-/* Animated gradient text */
+/* Animations */
+@keyframes sirax-pulse-ring {
+  0% { transform: scale(0.7); opacity: 0.9; }
+  70% { transform: scale(1.6); opacity: 0; }
+  100% { opacity: 0; }
+}
+.sirax-pulse-ring { animation: sirax-pulse-ring 2.4s cubic-bezier(0.215,0.61,0.355,1) infinite; }
+
+@keyframes sirax-float {
+  0%,100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+.sirax-float { animation: sirax-float 6s ease-in-out infinite; }
+
+@keyframes sirax-shimmer-bg {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.sirax-shimmer {
+  background: linear-gradient(90deg, transparent, rgba(123,224,255,0.15), transparent);
+  background-size: 200% 100%;
+  animation: sirax-shimmer-bg 2.5s linear infinite;
+}
+
+/* Gradient text animation (legacy landing compat) */
+@keyframes sirax-shimmer {
+  0% { background-position: 0% center; }
+  100% { background-position: 200% center; }
+}
 .sirax-gradient-text {
-  background: linear-gradient(
-    100deg,
-    #ffffff 0%,
-    #ffffff 35%,
-    var(--sirax-teal-bright) 60%,
-    #ffffff 85%
-  );
+  background: linear-gradient(100deg, #ffffff 0%, #ffffff 35%, var(--sirax-teal-bright) 60%, #ffffff 85%);
   background-size: 200% auto;
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
   animation: sirax-shimmer 6s linear infinite;
 }
-@keyframes sirax-shimmer {
-  0% { background-position: 0% center; }
-  100% { background-position: 200% center; }
-}
 
-/* Floating pulse dot */
-.sirax-pulse-dot {
-  position: relative;
+/* Marquee */
+@keyframes sirax-marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
 }
+.sirax-marquee { animation: sirax-marquee 28s linear infinite; }
+
+/* Pulse dot */
+.sirax-pulse-dot { position: relative; }
 .sirax-pulse-dot::after {
   content: "";
   position: absolute;
@@ -225,57 +232,32 @@
   border-radius: 9999px;
   background: var(--sirax-teal);
   opacity: 0.6;
-  animation: sirax-ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+  animation: sirax-ping 2s cubic-bezier(0,0,0.2,1) infinite;
 }
 @keyframes sirax-ping {
-  75%, 100% {
-    transform: scale(2.2);
-    opacity: 0;
-  }
+  75%,100% { transform: scale(2.2); opacity: 0; }
 }
 
-/* Scroll-reveal helper (fallback if framer-motion is not yet hydrated) */
-.sirax-reveal {
-  opacity: 0;
-  transform: translateY(24px);
-  transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1), transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+/* Grid hero */
+.sirax-grid {
+  background-image:
+    linear-gradient(rgba(0,209,160,0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,209,160,0.06) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+  mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
 }
-.sirax-reveal.is-visible {
-  opacity: 1;
-  transform: none;
-}
-
-/* Hide scrollbar but keep scroll for marquee */
-.sirax-no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-.sirax-no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-/* Marquee animation */
-@keyframes sirax-marquee {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
-}
-.sirax-marquee {
-  animation: sirax-marquee 28s linear infinite;
-}
-
-/* Soft glow used behind hero cards */
 .sirax-glow-teal {
-  background: radial-gradient(circle at center, rgba(0, 209, 160, 0.45) 0%, rgba(0, 209, 160, 0) 70%);
+  background: radial-gradient(circle at center, rgba(0,209,160,0.45) 0%, rgba(0,209,160,0) 70%);
   filter: blur(20px);
 }
 
-/* Custom selection */
-::selection {
-  background: var(--sirax-teal);
-  color: var(--sirax-navy);
-}
+/* Scrollbar */
+.sirax-no-scrollbar::-webkit-scrollbar { display: none; }
+.sirax-no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-/* Smooth scroll */
-html {
-  scroll-behavior: smooth;
-}
+/* Reveal */
+.sirax-reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.7s cubic-bezier(0.22,1,0.36,1), transform 0.7s cubic-bezier(0.22,1,0.36,1); }
+.sirax-reveal.is-visible { opacity: 1; transform: none; }
+
+::selection { background: var(--sirax-teal); color: var(--sirax-navy); }
