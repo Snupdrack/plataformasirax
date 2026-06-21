@@ -1,56 +1,70 @@
 # syntax=docker/dockerfile:1.7
-# Sirax · Synkdata — Production Dockerfile
-# Multi-stage build producing a minimal image running the Next.js standalone server.
+# Sirax · Synkdata — Production Dockerfile (Railway)
+# Multi-stage build: builder → runner minimal
 
-# ---------- 1. Builder ----------
+# ─────────────────────────────────────────────
+# 1. BUILDER
+# ─────────────────────────────────────────────
 FROM node:20-slim AS builder
 WORKDIR /app
 
-# Install bun for faster installs (optional)
-RUN npm install -g bun
+# Dependencias del sistema para Prisma
+RUN apt-get update -qq && apt-get install -y --no-install-recommends \
+    openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 
-# Copy lockfiles first for cache
-COPY package.json bun.lock* package-lock.json* ./
+# Lockfiles primero (cache de capas)
+COPY package.json package-lock.json* bun.lock* ./
 COPY prisma ./prisma
 
-# Install deps
-RUN if [ -f bun.lock ]; then bun install --frozen-lockfile; else npm ci; fi
+# Instalar dependencias
+RUN npm ci
 
-# Copy the rest of the source
+# Generar Prisma client
+RUN npx prisma generate
+
+# Copiar fuente y construir
 COPY . .
-
-# Build (outputs .next/standalone + .next/static + public/)
 RUN npm run build
 
-# ---------- 2. Runner ----------
+# ─────────────────────────────────────────────
+# 2. RUNNER
+# ─────────────────────────────────────────────
 FROM node:20-slim AS runner
 WORKDIR /app
 
+RUN apt-get update -qq && apt-get install -y --no-install-recommends \
+    openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+
 ENV NODE_ENV=production
 ENV PORT=3000
+ENV NEXT_TELEMETRY_DISABLED=1
 ENV NEXT_PUBLIC_APP_NAME="Sirax"
 ENV NEXT_PUBLIC_APP_VENDOR="Synkdata"
 
-# Non-root user
-RUN useradd --system --uid 1001 nextjs
+# Usuario sin privilegios
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 --ingroup nodejs nextjs
+
+# Servidor standalone
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+
+# Prisma client + schema (para migraciones en runtime)
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
+
+# Script de arranque (migración + servidor)
+COPY --chown=nextjs:nodejs scripts/start.sh ./start.sh
+RUN chmod +x ./start.sh
+
 USER nextjs
-
-# Copy standalone server
-COPY --from=builder --chown=nextjs:nextjs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nextjs /app/.next/static ./.next/static
-COPY --from=builder --chown=nextjs:nextjs /app/public ./public
-COPY --from=builder --chown=nextjs:nextjs /app/prisma ./prisma
-COPY --from=builder --chown=nextjs:nextjs /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder --chown=nextjs:nextjs /app/node_modules/@prisma ./node_modules/@prisma
-
-# SQLite db volume
-RUN mkdir -p /app/db && chown nextjs:nextjs /app/db
-VOLUME ["/app/db"]
 
 EXPOSE 3000
 
-# Healthcheck hits /api/health
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD node -e "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
-CMD ["node", "server.js"]
+CMD ["./start.sh"]
