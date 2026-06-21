@@ -501,19 +501,29 @@ class RfcValidatorService:
     # -----------------------------------------------------------------------
 
     async def _call_apimarket_rfc(self, rfc: str) -> Optional[Dict[str, Any]]:
-        """Fallback: Consulta RFC en APIMarket."""
+        """Fallback: Consulta RFC en APIMarket.
+        
+        Endpoint correcto: POST https://apimarket.mx/api/sat/grupo/validar-rfc?rfc={rfc}
+        El API key va en el header X-API-Key (no Authorization Bearer).
+        """
         if not self._settings.APIMARKET_API_KEY:
             return None
         
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.get(
-                    f"{self._settings.APIMARKET_API_URL}/rfc/{rfc}",
-                    headers={"Authorization": f"Bearer {self._settings.APIMARKET_API_KEY}"}
+                response = await client.post(
+                    f"{self._settings.APIMARKET_API_URL}/sat/grupo/validar-rfc",
+                    params={"rfc": rfc},
+                    headers={"X-API-Key": self._settings.APIMARKET_API_KEY},
                 )
                 if response.status_code == 200:
                     logger.info("RFC %s validado exitosamente vía APIMarket", rfc)
                     return response.json()
+                else:
+                    logger.warning(
+                        "APIMarket RFC respondió HTTP %d para %s: %s",
+                        response.status_code, rfc, response.text[:200],
+                    )
         except Exception as exc:
             logger.error("Error consultando APIMarket para RFC %s: %s", rfc, exc)
         return None

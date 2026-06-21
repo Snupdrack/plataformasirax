@@ -634,6 +634,7 @@ class SocialDiscoveryResult(BaseModel):
         presence_score: Puntuación de presencia digital.
         linkedin_profiles: Perfiles de LinkedIn encontrados.
         github_profile: Perfil de GitHub encontrado.
+        sources_summary: Resumen explícito de fuentes consultadas con estado VINCULADO/NO VINCULADO.
     """
 
     profiles_found: int = Field(
@@ -668,6 +669,14 @@ class SocialDiscoveryResult(BaseModel):
     github_profile: Optional[GitHubProfile] = Field(
         default=None,
         description="Perfil de GitHub encontrado.",
+    )
+    sources_summary: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description=(
+            "Resumen explícito de cada fuente consultada. "
+            "Cada entrada contiene: platform, linked (bool), status_label "
+            "(VINCULADO / NO VINCULADO / ENCONTRADO), url, snippet, category."
+        ),
     )
 
     model_config = {"from_attributes": True}

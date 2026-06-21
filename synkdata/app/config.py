@@ -213,7 +213,11 @@ class Settings(BaseSettings):
         description="Clave API para APIMarket (fallback para CURP/RFC).",
         validation_alias="APIMARKET_API_KEY",
     )
-    APIMARKET_API_URL: str = "https://api.apimarket.mx/v1"
+    # ⚠️  FIX: el host real es apimarket.mx (sin subdominio "api.").
+    # Los endpoints son POST, no GET:
+    #   CURP → POST https://apimarket.mx/api/renapo/grupo/valida-curp?curp={curp}
+    #   RFC  → POST https://apimarket.mx/api/sat/grupo/validar-rfc?rfc={rfc}
+    APIMARKET_API_URL: str = "https://apimarket.mx/api"
 
     MAIGRET_PATH: str = Field(
         default="maigret",
