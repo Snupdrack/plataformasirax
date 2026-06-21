@@ -111,6 +111,7 @@ class SocialDiscoveryResult:
         presence_score: Puntuación de presencia digital.
         linkedin_profiles: Perfiles de LinkedIn.
         github_profile: Perfil de GitHub.
+        sources_summary: Resumen explícito de fuentes consultadas y estado de vinculación.
     """
 
     profiles_found: int = 0
@@ -120,6 +121,145 @@ class SocialDiscoveryResult:
     presence_score: float = 0.0
     linkedin_profiles: List[LinkedInProfile] = field(default_factory=list)
     github_profile: Optional[GitHubProfile] = None
+    # Nuevo: resumen explícito de fuentes para el reporte final
+    sources_summary: List[Dict[str, Any]] = field(default_factory=list)
+
+
+
+# ---------------------------------------------------------------------------
+# Helper: inferir plataforma de origen a partir de la URL del resultado
+# ---------------------------------------------------------------------------
+_PLATFORM_PATTERNS: list[tuple[str, str]] = [
+    ("instagram.com", "Instagram"),
+    ("facebook.com", "Facebook"),
+    ("x.com", "X (Twitter)"),
+    ("twitter.com", "X (Twitter)"),
+    ("linkedin.com", "LinkedIn"),
+    ("tiktok.com", "TikTok"),
+    ("youtube.com", "YouTube"),
+    ("github.com", "GitHub"),
+    ("reddit.com", "Reddit"),
+    ("buholegal.com", "Buho Legal"),
+    ("poderjudicial.gob.mx", "Poder Judicial MX"),
+    ("anunciosjudiciales.gob.mx", "Anuncios Judiciales MX"),
+    ("siger.economia.gob.mx", "SIGER Economía MX"),
+    ("listaspam.com", "ListaSpam"),
+    ("quienhabla.com", "QuienHabla"),
+    ("teledigo.com", "TeleDigo"),
+    ("responderono.com", "ResponderONo"),
+    ("complaintsboard.com", "ComplaintsBoard"),
+    ("apestan.com", "Apestan"),
+    ("gob.mx", "Gobierno MX"),
+]
+
+
+def _infer_platform_from_url(url: str) -> str:
+    """Devuelve el nombre de la plataforma social/fuente dada una URL."""
+    url_lower = (url or "").lower()
+    for pattern, name in _PLATFORM_PATTERNS:
+        if pattern in url_lower:
+            return name
+    # Intentar extraer dominio raíz como fallback
+    try:
+        from urllib.parse import urlparse
+        host = urlparse(url_lower).netloc
+        if host.startswith("www."):
+            host = host[4:]
+        return host or "Web"
+    except Exception:
+        return "Web"
+
+
+# Plataformas conocidas que siempre se consultan (aunque no retornen resultados)
+_ALWAYS_CHECKED_PLATFORMS = [
+    "Instagram", "Facebook", "X (Twitter)", "LinkedIn",
+    "TikTok", "YouTube", "GitHub",
+]
+
+
+def _build_sources_summary(result: "SocialDiscoveryResult") -> List[Dict[str, Any]]:
+    """
+    Construye un resumen explícito de fuentes consultadas con estado de vinculación.
+
+    Para cada plataforma importante indica:
+    - platform: nombre de la plataforma
+    - linked: True si se encontró presencia, False si no
+    - status_label: "VINCULADO" | "NO VINCULADO"
+    - url: URL del perfil encontrado (si aplica)
+    - snippet: descripción o extracto (si aplica)
+    - category: categoría de la fuente (social, legal, fraud, etc.)
+
+    Returns:
+        List[Dict]: Lista ordenada de fuentes con su estado.
+    """
+    # Indexar los perfiles encontrados por plataforma
+    found_by_platform: Dict[str, List[Dict[str, Any]]] = {}
+    for profile in result.social_profiles:
+        platform = profile.get("platform", "Web")
+        found_by_platform.setdefault(platform, []).append(profile)
+
+    # Añadir LinkedIn de los perfiles estructurados
+    for li in result.linkedin_profiles:
+        if li.profile_url and not li.profile_url.startswith("https://www.linkedin.com/pub/dir"):
+            found_by_platform.setdefault("LinkedIn", []).append({
+                "platform": "LinkedIn",
+                "url": li.profile_url,
+                "name": li.name,
+                "snippet": f"{li.headline} — {li.company}".strip(" —"),
+                "category": "professional",
+                "linked": True,
+            })
+
+    # Añadir GitHub del perfil estructurado
+    if result.github_profile and result.github_profile.username:
+        found_by_platform.setdefault("GitHub", []).append({
+            "platform": "GitHub",
+            "url": result.github_profile.profile_url,
+            "name": result.github_profile.username,
+            "snippet": result.github_profile.bio or "",
+            "category": "developer",
+            "linked": True,
+        })
+
+    summary: List[Dict[str, Any]] = []
+
+    # 1. Plataformas siempre consultadas
+    for platform in _ALWAYS_CHECKED_PLATFORMS:
+        profiles = found_by_platform.get(platform, [])
+        if profiles:
+            for p in profiles:
+                summary.append({
+                    "platform": platform,
+                    "linked": True,
+                    "status_label": "VINCULADO",
+                    "url": p.get("url", ""),
+                    "snippet": p.get("snippet", ""),
+                    "category": p.get("category", "social"),
+                })
+        else:
+            summary.append({
+                "platform": platform,
+                "linked": False,
+                "status_label": "NO VINCULADO",
+                "url": "",
+                "snippet": "",
+                "category": "social",
+            })
+
+    # 2. Fuentes adicionales (dorks: legal, fraud, leak, corporate, spam_report)
+    extra_platforms = set(found_by_platform.keys()) - set(_ALWAYS_CHECKED_PLATFORMS)
+    for platform in sorted(extra_platforms):
+        for p in found_by_platform[platform]:
+            summary.append({
+                "platform": platform,
+                "linked": True,
+                "status_label": "ENCONTRADO",
+                "url": p.get("url", ""),
+                "snippet": p.get("snippet", ""),
+                "category": p.get("category", "general"),
+            })
+
+    return summary
 
 
 class SocialDiscoveryService:
@@ -237,28 +377,45 @@ class SocialDiscoveryService:
         # ── Ejecutar búsquedas en paralelo ───────────────────────────────
         search_results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        # ── Procesar resultados de LinkedIn ──────────────────────────────
+        # ── Procesar resultados ──────────────────────────────────────────
+        # IMPORTANTE: GitHubProfile NO es list, pero LinkedInProfile-list y
+        # SerpApi-list SÍ son ambas `list`.  Hay que distinguirlas ANTES del
+        # `isinstance(list)` genérico, de lo contrario el primer `if` absorbe
+        # los dorks de SerpApi (que también son lista de dicts) y el `elif`
+        # que los procesaba correctamente nunca se ejecuta.
         for search_result in search_results:
+            if isinstance(search_result, Exception):
+                logger.debug("Tarea de búsqueda falló: %s", search_result)
+                continue
+
+            if isinstance(search_result, GitHubProfile):
+                result.github_profile = search_result
+                continue
+
             if isinstance(search_result, list):
-                # Resultado de LinkedIn
                 for item in search_result:
                     if isinstance(item, LinkedInProfile):
+                        # Lista proveniente de search_linkedin()
                         result.linkedin_profiles.append(item)
-            elif isinstance(search_result, GitHubProfile):
-                result.github_profile = search_result
-            elif isinstance(search_result, list) and len(search_result) > 0 and isinstance(search_result[0], dict) and search_result[0].get("source") == "Google (via SerpApi)":
-                # Resultados de SerpApi
-                for res in search_result:
-                    category = res.get("category", "social")
-                    result.social_profiles.append({
-                        "platform": "Google Search",
-                        "name": res.get("title"),
-                        "url": res.get("link"),
-                        "snippet": res.get("snippet"),
-                        "category": category,
-                    })
-            else:
-                logger.debug("Resultado de búsqueda inesperado: %s", type(search_result))
+                    elif isinstance(item, dict) and item.get("source") == "Google (via SerpApi)":
+                        # Lista proveniente de search_google_dorks()
+                        # Determinar plataforma de origen a partir de la URL
+                        link = item.get("link", "")
+                        source_platform = _infer_platform_from_url(link)
+                        category = item.get("category", "general")
+                        result.social_profiles.append({
+                            "platform": source_platform,
+                            "source": "Google (via SerpApi)",
+                            "name": item.get("title"),
+                            "url": link,
+                            "snippet": item.get("snippet"),
+                            "category": category,
+                            # Campo explícito para el reporte: estado de vinculación
+                            "linked": True,  # Encontrado = vinculado
+                        })
+                continue
+
+            logger.debug("Resultado de búsqueda con tipo inesperado: %s", type(search_result))
 
         # ── Agregar perfiles de GitHub a social_profiles ─────────────────
         if result.github_profile:
@@ -289,6 +446,11 @@ class SocialDiscoveryService:
 
         # ── Calcular número total de perfiles ────────────────────────────
         result.profiles_found = len(result.social_profiles)
+
+        # ── Construir resumen explícito de fuentes ───────────────────────
+        # Agrupa por plataforma y marca si está vinculada (encontrada) o no.
+        # Formato del reporte: "Instagram → VINCULADO", "X → NO VINCULADO", etc.
+        result.sources_summary = _build_sources_summary(result)
 
         # ── Calcular puntuación profesional ──────────────────────────────
         result.professional_score = await self.calculate_professional_score(
@@ -939,6 +1101,7 @@ class SocialDiscoveryService:
             },
             "digital_footprint_score": result.digital_footprint_score,
             "presence_score": result.presence_score,
+            "sources_summary": result.sources_summary,
             "linkedin_profiles": [
                 {
                     "name": p.name,
@@ -978,6 +1141,7 @@ class SocialDiscoveryService:
             social_profiles=data.get("social_profiles", []),
             digital_footprint_score=data.get("digital_footprint_score", 0.0),
             presence_score=data.get("presence_score", 0.0),
+            sources_summary=data.get("sources_summary", []),
         )
 
         # ── Reconstruir puntuación profesional ────────────────────────────
