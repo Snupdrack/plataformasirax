@@ -40,17 +40,17 @@
         extend: {
           colors: {
             navy: {
-              DEFAULT: '#0A0E27',
+              DEFAULT: '#050813',
               50:  '#EEF1FB',
               100: '#D5DAF1',
               200: '#A8B2DD',
               300: '#7481C4',
               400: '#4754A4',
               500: '#27347C',
-              600: '#1B244F',
-              700: '#131A40',
-              800: '#0E1332',
-              900: '#070A1C',
+              600: '#0E1340',
+              700: '#0A0E27',
+              800: '#080C1A',
+              900: '#050813',
             },
             brand: {
               DEFAULT: '#2563EB',
@@ -77,6 +77,9 @@
               700: '#0080A3',
               800: '#005680',
               900: '#003B59',
+            },
+            violet: {
+              DEFAULT: '#7C3AED',
             },
             success: { DEFAULT: '#10B981', soft: '#D1FAE5' },
             warning: { DEFAULT: '#F59E0B', soft: '#FEF3C7' },
@@ -124,7 +127,9 @@
   {% block head_extra %}{% endblock %}
 </head>
 
-<body class="min-h-full bg-slate-50 text-slate-900 font-sans" x-data="{ }">
+<body class="min-h-full font-sans" style="background:#050813;color:#E2E8F0;" x-data="{ }">
+  <!-- Ambient cursor glow (follows mouse) -->
+  <div id="cursor-glow" class="cursor-glow" aria-hidden="true"></div>
   <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:bg-white focus:text-navy focus:px-4 focus:py-2 focus:rounded-lg focus:shadow-sd-md">
     Saltar al contenido principal
   </a>
@@ -149,6 +154,39 @@
 
   {# Per-page scripts #}
   {% block scripts %}{% endblock %}
+
+  {# Sirax Dark Neon — cursor glow + page entrance #}
+  <script>
+  (function(){
+    // Cursor glow follows mouse
+    const glow = document.getElementById('cursor-glow');
+    if (glow) {
+      document.addEventListener('mousemove', function(e){
+        glow.style.left = e.clientX + 'px';
+        glow.style.top  = e.clientY + 'px';
+      }, { passive: true });
+    }
+    // Animate stat numbers on page load
+    function animateNumbers(){
+      document.querySelectorAll('[data-count]').forEach(function(el){
+        const target = parseInt(el.dataset.count, 10);
+        if(isNaN(target)) return;
+        let current = 0;
+        const step = Math.ceil(target / 40);
+        const timer = setInterval(function(){
+          current = Math.min(current + step, target);
+          el.textContent = current.toLocaleString('es-MX');
+          if(current >= target) clearInterval(timer);
+        }, 30);
+      });
+    }
+    if(document.readyState === 'loading'){
+      document.addEventListener('DOMContentLoaded', animateNumbers);
+    } else {
+      setTimeout(animateNumbers, 100);
+    }
+  })();
+  </script>
 
   {# Server-side context for client-side hydration (optional) #}
   {% block hydration %}
