@@ -24,9 +24,11 @@ import {
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   PieChart, Pie, Cell, Legend, LineChart, Line,
+  AreaChart, Area,
   ResponsiveContainer, RadialBarChart, RadialBar,
 } from 'recharts'
 import { useToast } from '@/hooks/use-toast'
+import { generateCheckPDF } from '@/lib/generate-pdf'
 
 // ==================== API Helper ====================
 const API = {
@@ -404,21 +406,21 @@ function LandingModule({
       <motion.div
         whileHover={{ y: -4 }}
         transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-        className="group relative h-full p-6 bg-white border border-slate-200 rounded-xl hover:border-sirax-teal transition-colors overflow-hidden"
+        className="group relative h-full p-6 bg-white border border-white/8 rounded-xl hover:border-sirax-teal transition-colors overflow-hidden"
       >
         <div className="absolute -top-12 -right-12 w-32 h-32 rounded-full bg-sirax-teal-soft opacity-0 group-hover:opacity-100 blur-2xl transition-opacity duration-500" />
         <div className="relative">
           <div className="flex items-center justify-between mb-4">
-            <div className="h-11 w-11 bg-sirax-navy text-white flex items-center justify-center rounded-lg group-hover:bg-sirax-teal group-hover:text-sirax-navy transition-colors">
+            <div className="h-11 w-11 bg-sirax-navy text-white flex items-center justify-center rounded-lg group-hover:bg-sirax-teal group-hover:text-white transition-colors">
               <Icon className="h-5 w-5" strokeWidth={1.75} />
             </div>
-            <ChevronRight className="h-4 w-4 text-slate-300 group-hover:text-sirax-teal group-hover:translate-x-1 transition-all" />
+            <ChevronRight className="h-4 w-4 text-white/55 group-hover:text-sirax-teal group-hover:translate-x-1 transition-all" />
           </div>
           <h3 className="font-bold text-slate-950 text-lg mb-2">{title}</h3>
-          <p className="text-sm text-slate-500 mb-4 leading-relaxed">{desc}</p>
+          <p className="text-sm text-white/45 mb-4 leading-relaxed">{desc}</p>
           <ul className="space-y-1.5">
             {items.map((it: string) => (
-              <li key={it} className="text-xs text-slate-600 font-mono flex items-center gap-1.5">
+              <li key={it} className="text-xs text-white/60 font-mono flex items-center gap-1.5">
                 <span className="h-1 w-1 rounded-full bg-sirax-teal" />
                 {it}
               </li>
@@ -460,17 +462,17 @@ function LandingView() {
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-        className="fixed top-0 inset-x-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200"
+        className="fixed top-0 inset-x-0 z-50 bg-white/80 backdrop-blur-md border-b border-white/8"
       >
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <button onClick={() => navigate('landing')} className="flex items-center">
             <SiraxLogo size={30} variant="dark" showTagline />
           </button>
-          <nav className="hidden md:flex items-center gap-8 text-sm text-slate-600">
-            <a href="#modules" className="hover:text-sirax-navy transition-colors">Plataforma</a>
-            <a href="#coverage" className="hover:text-sirax-navy transition-colors">Cobertura</a>
-            <a href="#api" className="hover:text-sirax-navy transition-colors">API</a>
-            <button onClick={() => navigate('api-docs')} className="hover:text-sirax-navy transition-colors">Docs</button>
+          <nav className="hidden md:flex items-center gap-8 text-sm text-white/60">
+            <a href="#modules" className="hover:text-white transition-colors">Plataforma</a>
+            <a href="#coverage" className="hover:text-white transition-colors">Cobertura</a>
+            <a href="#api" className="hover:text-white transition-colors">API</a>
+            <button onClick={() => navigate('api-docs')} className="hover:text-white transition-colors">Docs</button>
           </nav>
           <div className="flex items-center gap-3">
             {user ? (
@@ -483,7 +485,7 @@ function LandingView() {
               </motion.button>
             ) : (
               <>
-                <button onClick={() => navigate('login')} className="text-sm font-medium text-slate-600 hover:text-sirax-navy">
+                <button onClick={() => navigate('login')} className="text-sm font-medium text-white/60 hover:text-white">
                   Iniciar sesión
                 </button>
                 <motion.button
@@ -519,7 +521,7 @@ function LandingView() {
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.1 }}
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-xs font-medium text-slate-300 mb-6 backdrop-blur"
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/5 text-xs font-medium text-white/55 mb-6 backdrop-blur"
             >
               <span className="relative flex h-1.5 w-1.5">
                 <span className="absolute inset-0 rounded-full bg-sirax-teal animate-ping opacity-75" />
@@ -551,7 +553,7 @@ function LandingView() {
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7, delay: 0.4 }}
-              className="text-base sm:text-lg text-slate-400 max-w-xl mb-8 leading-relaxed"
+              className="text-base sm:text-lg text-white/40 max-w-xl mb-8 leading-relaxed"
             >
               sirax centraliza fuentes gubernamentales, listas regulatorias internacionales,
               inteligencia digital y análisis relacional para entregar una visión completa de
@@ -597,7 +599,7 @@ function LandingView() {
                   <div className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
                     <Counter to={s.v} prefix={s.prefix} suffix={s.suffix} decimals={s.decimals || 0} />
                   </div>
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500 mt-1.5">
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-white/45 mt-1.5">
                     {s.l}
                   </div>
                 </div>
@@ -617,7 +619,7 @@ function LandingView() {
               <div className="absolute -inset-1 sirax-glow-teal opacity-40 -z-10 rounded-2xl" />
 
               <div className="flex items-center justify-between mb-4">
-                <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500">
+                <div className="text-[10px] uppercase tracking-[0.2em] text-white/45">
                   Live demo · Trust Score
                 </div>
                 <div className="flex items-center gap-1 text-[10px] text-sirax-teal font-mono">
@@ -639,7 +641,7 @@ function LandingView() {
                   <div className="px-2 py-0.5 rounded text-xs font-bold bg-sirax-teal text-sirax-navy">
                     BAJO RIESGO
                   </div>
-                  <div className="text-xs text-slate-400 mt-1.5">Recomendación: APROBAR</div>
+                  <div className="text-xs text-white/40 mt-1.5">Recomendación: APROBAR</div>
                 </div>
               </div>
 
@@ -660,8 +662,8 @@ function LandingView() {
                     transition={{ duration: 0.5, delay: 0.8 + i * 0.08 }}
                     className="flex items-center justify-between p-2 rounded-md border border-white/5 bg-white/[0.02]"
                   >
-                    <span className="text-slate-400">{k}</span>
-                    <div className="flex items-center gap-1.5 text-slate-200 font-medium">
+                    <span className="text-white/40">{k}</span>
+                    <div className="flex items-center gap-1.5 text-white/65 font-medium">
                       <CheckCircle2 className="h-3.5 w-3.5 text-sirax-teal" strokeWidth={2.5} />
                       {v}
                     </div>
@@ -675,14 +677,14 @@ function LandingView() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7, delay: 1 }}
-              className="absolute -left-4 -bottom-4 hidden md:flex items-center gap-2 px-3 py-2 rounded-lg bg-white text-sirax-navy shadow-xl border border-slate-100"
+              className="absolute -left-4 -bottom-4 hidden md:flex items-center gap-2 px-3 py-2 rounded-lg bg-white text-sirax-navy shadow-xl border border-white/6"
             >
               <div className="h-7 w-7 rounded-md bg-sirax-teal/15 flex items-center justify-center">
                 <Sparkles className="h-3.5 w-3.5 text-sirax-teal" />
               </div>
               <div className="text-[11px] font-semibold leading-tight">
                 AI Report<br />
-                <span className="text-slate-500 font-normal">generado en 1.4s</span>
+                <span className="text-white/45 font-normal">generado en 1.4s</span>
               </div>
             </motion.div>
           </div>
@@ -693,7 +695,7 @@ function LandingView() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1.4, duration: 0.8 }}
-          className="absolute bottom-6 left-1/2 -translate-x-1/2 text-slate-500 text-[10px] uppercase tracking-[0.3em] flex flex-col items-center gap-2"
+          className="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/45 text-[10px] uppercase tracking-[0.3em] flex flex-col items-center gap-2"
         >
           <span>Scroll</span>
           <motion.div
@@ -707,7 +709,7 @@ function LandingView() {
       {/* Trust marquee */}
       <section className="bg-sirax-navy border-t border-white/5 py-6 overflow-hidden">
         <div className="flex items-center gap-3 mb-3 px-6 max-w-7xl mx-auto">
-          <div className="text-[10px] uppercase tracking-[0.24em] text-slate-500">
+          <div className="text-[10px] uppercase tracking-[0.24em] text-white/45">
             Fuentes correlacionadas
           </div>
           <div className="flex-1 h-px bg-white/5" />
@@ -717,7 +719,7 @@ function LandingView() {
             {[...coverageSources, ...coverageSources].map((s, i) => (
               <div
                 key={i}
-                className="px-4 py-2 rounded-md border border-white/10 bg-white/[0.03] text-xs font-mono font-medium text-slate-400 whitespace-nowrap"
+                className="px-4 py-2 rounded-md border border-white/10 bg-white/[0.03] text-xs font-mono font-medium text-white/40 whitespace-nowrap"
               >
                 {s}
               </div>
@@ -727,7 +729,7 @@ function LandingView() {
       </section>
 
       {/* Modules */}
-      <section id="modules" className="py-24 bg-slate-50 relative overflow-hidden">
+      <section id="modules" className="py-24 bg-white/[0.02] relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-sirax-teal/5 rounded-full blur-3xl" />
         <div className="relative max-w-7xl mx-auto px-6">
           <Reveal className="max-w-2xl mb-12">
@@ -737,9 +739,9 @@ function LandingView() {
             </div>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-sirax-navy mb-4">
               Una sola plataforma.<br />
-              <span className="text-slate-400">Diez módulos de inteligencia.</span>
+              <span className="text-white/40">Diez módulos de inteligencia.</span>
             </h2>
-            <p className="text-slate-500 max-w-xl">
+            <p className="text-white/45 max-w-xl">
               Cada módulo opera de forma independiente o se correlaciona con los demás para
               construir una vista 360° del sujeto, con scoring estandarizado y reporte AI en
               español listo para auditoría.
@@ -779,7 +781,7 @@ function LandingView() {
       </section>
 
       {/* Coverage */}
-      <section id="coverage" className="py-24 bg-white border-y border-slate-200 relative">
+      <section id="coverage" className="py-24 bg-white border-y border-white/8 relative">
         <div className="max-w-7xl mx-auto px-6">
           <div className="grid lg:grid-cols-12 gap-12 items-center">
             <Reveal className="lg:col-span-6" delay={0.05}>
@@ -789,9 +791,9 @@ function LandingView() {
               </div>
               <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-sirax-navy mb-5 leading-tight">
                 Sin reemplazar tus integraciones.<br />
-                <span className="text-slate-400">Las potencia.</span>
+                <span className="text-white/40">Las potencia.</span>
               </h2>
-              <p className="text-slate-500 mb-8 leading-relaxed max-w-xl">
+              <p className="text-white/45 mb-8 leading-relaxed max-w-xl">
                 sirax se diseñó como capa unificadora: consume tus integraciones existentes
                 y las correlaciona en una vista 360° del sujeto con scoring estandarizado y
                 reporte AI generado automáticamente.
@@ -806,7 +808,7 @@ function LandingView() {
                     <div className="text-2xl font-bold text-sirax-navy">
                       <Counter to={s.v} suffix={s.suffix} />
                     </div>
-                    <div className="text-[10px] uppercase tracking-wider text-slate-400 mt-1">
+                    <div className="text-[10px] uppercase tracking-wider text-white/40 mt-1">
                       {s.l}
                     </div>
                   </div>
@@ -824,7 +826,7 @@ function LandingView() {
                     viewport={{ once: true }}
                     transition={{ delay: i * 0.04, duration: 0.4 }}
                     whileHover={{ y: -2, borderColor: 'var(--sirax-teal)' }}
-                    className="px-3 py-3 rounded-lg border border-slate-200 bg-slate-50 text-xs font-mono font-medium text-slate-700 text-center"
+                    className="px-3 py-3 rounded-lg border border-white/8 bg-white/[0.02] text-xs font-mono font-medium text-white/70 text-center"
                   >
                     {s}
                   </motion.div>
@@ -844,7 +846,7 @@ function LandingView() {
           <div className="grid md:grid-cols-12 gap-8 mb-8">
             <div className="md:col-span-5">
               <SiraxLogo size={32} variant="light" showTagline />
-              <p className="text-sm text-slate-400 mt-4 max-w-sm leading-relaxed">
+              <p className="text-sm text-white/40 mt-4 max-w-sm leading-relaxed">
                 Identity & Risk Intelligence Platform. Verificación de identidad,
                 background checks y risk intelligence para México y LATAM.
               </p>
@@ -853,8 +855,8 @@ function LandingView() {
               </div>
             </div>
             <div className="md:col-span-2">
-              <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-3">Plataforma</div>
-              <ul className="space-y-2 text-sm text-slate-400">
+              <div className="text-[10px] uppercase tracking-[0.2em] text-white/45 mb-3">Plataforma</div>
+              <ul className="space-y-2 text-sm text-white/40">
                 <li><a href="#modules" className="hover:text-white transition-colors">Módulos</a></li>
                 <li><a href="#coverage" className="hover:text-white transition-colors">Cobertura</a></li>
                 <li><a href="#api" className="hover:text-white transition-colors">API</a></li>
@@ -862,22 +864,22 @@ function LandingView() {
               </ul>
             </div>
             <div className="md:col-span-2">
-              <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-3">Herramientas</div>
-              <ul className="space-y-2 text-sm text-slate-400">
+              <div className="text-[10px] uppercase tracking-[0.2em] text-white/45 mb-3">Herramientas</div>
+              <ul className="space-y-2 text-sm text-white/40">
                 <li><button onClick={() => navigate('curp')} className="hover:text-white transition-colors">Validador CURP</button></li>
                 <li><button onClick={() => navigate('rfc')} className="hover:text-white transition-colors">Validador RFC</button></li>
                 <li><button onClick={() => navigate('sanctions')} className="hover:text-white transition-colors">Screening Sanciones</button></li>
               </ul>
             </div>
             <div className="md:col-span-3">
-              <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-3">Synkdata</div>
-              <ul className="space-y-2 text-sm text-slate-400">
+              <div className="text-[10px] uppercase tracking-[0.2em] text-white/45 mb-3">Synkdata</div>
+              <ul className="space-y-2 text-sm text-white/40">
                 <li className="flex items-center gap-2"><Building2 className="h-3.5 w-3.5" /> Ciudad de México</li>
                 <li className="flex items-center gap-2"><Mail className="h-3.5 w-3.5" /> hello@synkdata.mx</li>
               </ul>
             </div>
           </div>
-          <div className="pt-6 border-t border-white/5 flex flex-col md:flex-row gap-3 items-center justify-between text-xs text-slate-500">
+          <div className="pt-6 border-t border-white/5 flex flex-col md:flex-row gap-3 items-center justify-between text-xs text-white/45">
             <div className="flex items-center gap-2">
               <span>© 2026 sirax · a Synkdata product</span>
             </div>
@@ -918,7 +920,7 @@ function ApiCtaSection({ navigate }: { navigate: (v: View, data?: any) => void }
             Una API.<br />
             <span className="sirax-gradient-text">Toda la inteligencia.</span>
           </h2>
-          <p className="text-slate-400 mb-8 max-w-md leading-relaxed">
+          <p className="text-white/40 mb-8 max-w-md leading-relaxed">
             Diseñada para CRMs, fintechs, ERPs, bancos, marketplaces y plataformas de RH.
             Verifica identidad, evalúa riesgo y obtén un reporte AI en una sola llamada.
           </p>
@@ -931,7 +933,7 @@ function ApiCtaSection({ navigate }: { navigate: (v: View, data?: any) => void }
               <div key={p} className="flex items-center gap-3 text-xs font-mono">
                 <span className="px-1.5 py-0.5 rounded bg-sirax-teal/15 text-sirax-teal font-bold">{m}</span>
                 <span className="text-white">{p}</span>
-                <span className="text-slate-500">— {d}</span>
+                <span className="text-white/45">— {d}</span>
               </div>
             ))}
           </div>
@@ -953,16 +955,16 @@ function ApiCtaSection({ navigate }: { navigate: (v: View, data?: any) => void }
           transition={{ duration: 0.8 }}
           className="relative"
         >
-          <div className="rounded-xl border border-white/10 bg-sirax-navy-soft/80 p-5 font-mono text-xs leading-6 text-slate-300 backdrop-blur shadow-2xl">
+          <div className="rounded-xl border border-white/10 bg-sirax-navy-soft/80 p-5 font-mono text-xs leading-6 text-white/55 backdrop-blur shadow-2xl">
             <div className="flex items-center gap-2 mb-4">
               <div className="h-2.5 w-2.5 rounded-full bg-rose-400/60" />
               <div className="h-2.5 w-2.5 rounded-full bg-amber-400/60" />
               <div className="h-2.5 w-2.5 rounded-full bg-sirax-teal/60" />
-              <div className="ml-2 text-[10px] text-slate-500">background_check.sh</div>
+              <div className="ml-2 text-[10px] text-white/45">background_check.sh</div>
             </div>
-            <div className="text-slate-500 mb-1"># Background check completo</div>
+            <div className="text-white/45 mb-1"># Background check completo</div>
             <div><span className="text-rose-400">POST</span> /api/checks</div>
-            <div className="text-slate-500 mt-3">{'{'}</div>
+            <div className="text-white/45 mt-3">{'{'}</div>
             <div className="pl-3">
               <span className="text-sky-400">{'"full_name"'}</span>: <span className="text-sirax-teal-bright">{'"Juan Pérez García"'}</span>,<br />
               <span className="text-sky-400">{'"curp"'}</span>: <span className="text-sirax-teal-bright">{'"PEGJ800101HDFRRN09"'}</span>,<br />
@@ -970,12 +972,12 @@ function ApiCtaSection({ navigate }: { navigate: (v: View, data?: any) => void }
               <span className="text-sky-400">{'"email"'}</span>: <span className="text-sirax-teal-bright">{'"juan@empresa.mx"'}</span>,<br />
               <span className="text-sky-400">{'"include_ai_report"'}</span>: <span className="text-amber-400">true</span>
             </div>
-            <div className="text-slate-500">{'}'}</div>
+            <div className="text-white/45">{'}'}</div>
             <div className="mt-3 pt-3 border-t border-white/5">
               <div className="text-sirax-teal">
                 trust_score: 92 · risk_level: BAJO · recommendation: APPROVE
               </div>
-              <div className="text-slate-500 mt-1">
+              <div className="text-white/45 mt-1">
                 ai_report: ✓ generado en 1.4s · 8 fuentes correlacionadas
               </div>
             </div>
@@ -1021,13 +1023,13 @@ function LoginView() {
               Know More.<br />
               <span className="sirax-gradient-text">Risk Less.</span>
             </h1>
-            <p className="text-slate-400 leading-relaxed">
+            <p className="text-white/40 leading-relaxed">
               Identity & Risk Intelligence Platform. Verificación de identidad,
               background checks y risk intelligence para México y LATAM.
             </p>
           </div>
           <div className="mt-8 p-4 rounded-lg border border-white/10 bg-white/[0.03] text-xs font-mono backdrop-blur">
-            <div className="text-slate-500 mb-2">Demo credentials:</div>
+            <div className="text-white/45 mb-2">Demo credentials:</div>
             <div>Admin: <span className="text-sirax-teal">admin@synkdata.mx</span></div>
             <div>Analyst: <span className="text-sirax-teal">analyst@synkdata.mx</span></div>
           </div>
@@ -1035,25 +1037,25 @@ function LoginView() {
       </div>
       <div className="flex-1 flex items-center justify-center p-8 bg-white">
         <div className="w-full max-w-md">
-          <button onClick={() => navigate('landing')} className="flex items-center gap-2 mb-8 text-slate-500 hover:text-sirax-navy text-sm">
+          <button onClick={() => navigate('landing')} className="flex items-center gap-2 mb-8 text-white/45 hover:text-white text-sm">
             <ChevronLeft className="h-4 w-4" /> Volver al inicio
           </button>
           <div className="mb-8 lg:hidden">
             <SiraxLogo size={36} variant="dark" />
           </div>
           <h2 className="text-3xl font-bold text-sirax-navy mb-2">Iniciar sesión</h2>
-          <p className="text-slate-500 mb-8">Accede a la consola de Identity Intelligence.</p>
+          <p className="text-white/45 mb-8">Accede a la consola de Identity Intelligence.</p>
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="text-sm font-medium text-slate-700 mb-1 block">Email</label>
+              <label className="text-sm font-medium text-white/70 mb-1 block">Email</label>
               <input type="email" value={email} onChange={e => setEmail(e.target.value)} required
-                className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal"
+                className="w-full px-3 py-2 rounded-md text-sm text-white placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal border border-white/10 bg-white/5"
                 placeholder="tu@email.com" />
             </div>
             <div>
-              <label className="text-sm font-medium text-slate-700 mb-1 block">Password</label>
+              <label className="text-sm font-medium text-white/70 mb-1 block">Password</label>
               <input type="password" value={password} onChange={e => setPassword(e.target.value)} required
-                className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal"
+                className="w-full px-3 py-2 rounded-md text-sm text-white placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal border border-white/10 bg-white/5"
                 placeholder="••••••••" />
             </div>
             <button type="submit" disabled={loading}
@@ -1061,7 +1063,7 @@ function LoginView() {
               {loading ? 'Verificando...' : 'Iniciar sesión'}
             </button>
           </form>
-          <p className="text-sm text-slate-500 mt-6 text-center">
+          <p className="text-sm text-white/45 mt-6 text-center">
             ¿No tienes cuenta? <button onClick={() => navigate('register')} className="text-sirax-teal font-semibold hover:underline">Crear cuenta</button>
           </p>
         </div>
@@ -1103,7 +1105,7 @@ function RegisterView() {
             <h1 className="text-3xl font-extrabold tracking-tight mb-3">
               Únete a sirax.
             </h1>
-            <p className="text-slate-400 leading-relaxed">
+            <p className="text-white/40 leading-relaxed">
               Accede a la plataforma de Identity & Risk Intelligence más completa
               para México y Latinoamérica.
             </p>
@@ -1115,41 +1117,41 @@ function RegisterView() {
       </div>
       <div className="flex-1 flex items-center justify-center p-8 bg-white">
         <div className="w-full max-w-md">
-          <button onClick={() => navigate('landing')} className="flex items-center gap-2 mb-8 text-slate-500 hover:text-sirax-navy text-sm">
+          <button onClick={() => navigate('landing')} className="flex items-center gap-2 mb-8 text-white/45 hover:text-white text-sm">
             <ChevronLeft className="h-4 w-4" /> Volver al inicio
           </button>
           <div className="mb-8 lg:hidden">
             <SiraxLogo size={36} variant="dark" />
           </div>
           <h2 className="text-3xl font-bold text-sirax-navy mb-2">Crear cuenta</h2>
-          <p className="text-slate-500 mb-8">Regístrate para acceder a la plataforma.</p>
+          <p className="text-white/45 mb-8">Regístrate para acceder a la plataforma.</p>
           <form onSubmit={handleRegister} className="space-y-4">
             <div>
-              <label className="text-sm font-medium text-slate-700 mb-1 block">Nombre completo</label>
+              <label className="text-sm font-medium text-white/70 mb-1 block">Nombre completo</label>
               <input type="text" value={form.fullName} onChange={e => setForm(f => ({ ...f, fullName: e.target.value }))} required
-                className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal" />
+                className="w-full px-3 py-2 rounded-md text-sm text-white placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal border border-white/10 bg-white/5" />
             </div>
             <div>
-              <label className="text-sm font-medium text-slate-700 mb-1 block">Email</label>
+              <label className="text-sm font-medium text-white/70 mb-1 block">Email</label>
               <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} required
-                className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal" />
+                className="w-full px-3 py-2 rounded-md text-sm text-white placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal border border-white/10 bg-white/5" />
             </div>
             <div>
-              <label className="text-sm font-medium text-slate-700 mb-1 block">Organización</label>
+              <label className="text-sm font-medium text-white/70 mb-1 block">Organización</label>
               <input type="text" value={form.organization} onChange={e => setForm(f => ({ ...f, organization: e.target.value }))}
-                className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal" />
+                className="w-full px-3 py-2 rounded-md text-sm text-white placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal border border-white/10 bg-white/5" />
             </div>
             <div>
-              <label className="text-sm font-medium text-slate-700 mb-1 block">Password</label>
+              <label className="text-sm font-medium text-white/70 mb-1 block">Password</label>
               <input type="password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} required
-                className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal" />
+                className="w-full px-3 py-2 rounded-md text-sm text-white placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal border border-white/10 bg-white/5" />
             </div>
             <button type="submit" disabled={loading}
               className="w-full bg-sirax-navy text-white py-2.5 rounded-md font-semibold text-sm hover:bg-sirax-navy-soft transition-colors disabled:opacity-50">
               {loading ? 'Creando cuenta...' : 'Crear cuenta'}
             </button>
           </form>
-          <p className="text-sm text-slate-500 mt-6 text-center">
+          <p className="text-sm text-white/45 mt-6 text-center">
             ¿Ya tienes cuenta? <button onClick={() => navigate('login')} className="text-sirax-teal font-semibold hover:underline">Iniciar sesión</button>
           </p>
         </div>
@@ -1175,7 +1177,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
   ]
 
   return (
-    <div className="min-h-screen flex bg-slate-50">
+    <div className="min-h-screen flex" style={{backgroundColor:"oklch(0.07 0.012 250)"}}>
       {/* Sidebar */}
       <aside className={`fixed inset-y-0 left-0 z-40 w-64 bg-sirax-navy text-white transform transition-transform lg:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="h-16 flex items-center px-5 border-b border-white/5">
@@ -1187,7 +1189,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
             return (
               <button key={item.key} onClick={() => { navigate(item.key); setMobileOpen(false) }}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
-                  active ? 'bg-sirax-teal/15 text-sirax-teal' : 'text-slate-400 hover:bg-white/5 hover:text-white'
+                  active ? 'bg-sirax-teal/15 text-sirax-teal' : 'text-white/40 hover:bg-white/5 hover:text-white'
                 }`}>
                 <item.icon className="h-4 w-4" strokeWidth={1.75} />
                 {item.label}
@@ -1203,11 +1205,11 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
             </div>
             <div className="flex-1 min-w-0">
               <div className="text-sm font-medium text-white truncate">{user?.full_name}</div>
-              <div className="text-[10px] uppercase tracking-wider text-slate-500">{user?.role}</div>
+              <div className="text-[10px] uppercase tracking-wider text-white/45">{user?.role}</div>
             </div>
           </div>
           <button onClick={() => { logout(); navigate('landing') }}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm text-slate-400 hover:bg-white/5 hover:text-white transition-colors">
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm text-white/40 hover:bg-white/5 hover:text-white transition-colors">
             <LogOut className="h-4 w-4" /> Cerrar sesión
           </button>
         </div>
@@ -1215,12 +1217,12 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
 
       {/* Main content */}
       <div className="flex-1 lg:ml-64">
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 lg:px-8">
+        <header className="h-16 flex items-center justify-between px-6 lg:px-8 border-b border-white/8" style={{backgroundColor:"oklch(0.09 0.013 250)"}}>
           <button onClick={() => setMobileOpen(true)} className="lg:hidden">
-            <Menu className="h-5 w-5 text-slate-600" />
+            <Menu className="h-5 w-5 text-white/60" />
           </button>
           <div className="flex items-center gap-3">
-            <div className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">
+            <div className="text-xs font-bold uppercase tracking-[0.2em] text-white/40">
               Identity & Risk Intelligence
             </div>
             <span className="hidden md:inline px-2 py-0.5 rounded text-[10px] font-semibold bg-sirax-teal/10 text-sirax-teal uppercase tracking-wider">
@@ -1230,7 +1232,7 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-3">
             <button
               onClick={() => navigate('new-check')}
-              className="hidden sm:inline-flex items-center gap-2 bg-sirax-navy text-white px-3 py-1.5 rounded-md text-xs font-semibold hover:bg-sirax-navy-soft transition-colors"
+              className="hidden sm:inline-flex items-center gap-2 bg-sirax-teal/15 border border-sirax-teal/30 text-sirax-teal px-3 py-1.5 rounded-md text-xs font-semibold hover:bg-sirax-teal/25 transition-colors"
             >
               <Plus className="h-3.5 w-3.5" /> Nuevo Check
             </button>
@@ -1248,13 +1250,13 @@ function DashboardLayout({ children }: { children: React.ReactNode }) {
 // ==================== Stat Card ====================
 function StatCard({ icon: Icon, label, value, sub, accent }: { icon: any; label: string; value: any; sub?: string; accent?: string }) {
   return (
-    <div className="p-5 bg-white border border-slate-200 rounded-lg">
+    <div className="p-5 rounded-2xl border border-white/8 bg-white/[0.025] sirax-card-glow">
       <div className={`h-9 w-9 flex items-center justify-center rounded-md mb-3 ${accent || 'bg-sirax-navy text-white'}`}>
         <Icon className="h-4 w-4" strokeWidth={1.75} />
       </div>
-      <div className="text-3xl font-extrabold tracking-tighter text-sirax-navy">{value}</div>
-      <div className="text-xs uppercase tracking-wider text-slate-500 font-semibold mt-1">{label}</div>
-      {sub && <div className="text-xs text-slate-400 mt-2">{sub}</div>}
+      <div className="text-3xl font-extrabold tracking-tighter text-white">{value}</div>
+      <div className="text-xs uppercase tracking-wider text-white/50 font-semibold mt-1">{label}</div>
+      {sub && <div className="text-xs text-white/35 mt-2">{sub}</div>}
     </div>
   )
 }
@@ -1275,7 +1277,7 @@ function DashboardView() {
     }
   }, [token])
 
-  if (loading) return <div className="p-8"><div className="animate-pulse space-y-4"><div className="h-8 bg-slate-200 rounded w-64" /><div className="grid grid-cols-4 gap-5">{[1,2,3,4].map(i => <div key={i} className="h-32 bg-slate-200 rounded-lg" />)}</div></div></div>
+  if (loading) return <div className="p-8"><div className="animate-pulse space-y-4"><div className="h-8 bg-white/8 rounded w-64" /><div className="grid grid-cols-4 gap-5">{[1,2,3,4].map(i => <div key={i} className="h-32 bg-white/8 rounded-lg" />)}</div></div></div>
 
   const riskData = Object.entries(data?.risk_distribution || {}).map(([level, count]: any) => ({ level, count, fill: RISK_COLORS[level] }))
   const recData = Object.entries(data?.recommendation_distribution || {}).map(([rec, count]: any) => ({ name: REC_LABEL[rec] || rec, value: count, fill: REC_COLORS[rec] }))
@@ -1291,10 +1293,10 @@ function DashboardView() {
           <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tighter text-sirax-navy">
             Bienvenido, {user?.full_name?.split(' ')[0]}
           </h1>
-          <p className="text-sm text-slate-500 mt-1">Identity Intelligence en tiempo real</p>
+          <p className="text-sm text-white/50 mt-1">Identity Intelligence en tiempo real</p>
         </div>
         <button onClick={() => navigate('new-check')}
-          className="inline-flex items-center gap-2 bg-sirax-navy text-white px-5 py-2.5 rounded-md font-semibold text-sm hover:bg-sirax-navy-soft transition-colors">
+          className="inline-flex items-center gap-2 bg-sirax-teal text-sirax-navy px-5 py-2.5 rounded-md font-semibold text-sm hover:bg-sirax-teal-bright transition-colors">
           <FileSearch className="h-4 w-4" /> Nuevo Background Check <ArrowRight className="h-4 w-4" />
         </button>
       </div>
@@ -1307,20 +1309,20 @@ function DashboardView() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <div className="lg:col-span-2 p-5 bg-white border border-slate-200 rounded-lg">
+        <div className="lg:col-span-2 p-5 rounded-2xl border border-white/8 bg-white/[0.025] sirax-card-glow">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Distribución</div>
-              <h3 className="font-bold text-sirax-navy">Niveles de riesgo</h3>
+              <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">Distribución</div>
+              <h3 className="font-bold text-white">Niveles de riesgo</h3>
             </div>
-            <TrendingUp className="h-4 w-4 text-slate-400" />
+            <TrendingUp className="h-4 w-4 text-white/40" />
           </div>
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={riskData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-              <XAxis dataKey="level" stroke="#64748b" fontSize={11} />
-              <YAxis stroke="#64748b" fontSize={11} allowDecimals={false} />
-              <Tooltip contentStyle={{ background: '#0a192f', border: 'none', borderRadius: 6, color: 'white', fontSize: 12 }} />
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.07)" vertical={false} />
+              <XAxis dataKey="level" stroke="rgba(255,255,255,0.4)" fontSize={11} />
+              <YAxis stroke="rgba(255,255,255,0.4)" fontSize={11} allowDecimals={false} />
+              <Tooltip contentStyle={{ background: 'rgba(8,10,15,0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: 'white', fontSize: 12 }} />
               <Bar dataKey="count" radius={[6, 6, 0, 0]}>
                 {riskData.map((entry, index) => <Cell key={index} fill={entry.fill} />)}
               </Bar>
@@ -1328,17 +1330,17 @@ function DashboardView() {
           </ResponsiveContainer>
         </div>
 
-        <div className="p-5 bg-white border border-slate-200 rounded-lg">
+        <div className="p-5 rounded-2xl border border-white/8 bg-white/[0.025] sirax-card-glow">
           <div className="mb-4">
-            <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Recomendaciones</div>
-            <h3 className="font-bold text-sirax-navy">Veredicto</h3>
+            <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">Recomendaciones</div>
+            <h3 className="font-bold text-white">Veredicto</h3>
           </div>
           <ResponsiveContainer width="100%" height={240}>
             <PieChart>
               <Pie data={recData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={45} outerRadius={75} paddingAngle={2}>
                 {recData.map((entry, index) => <Cell key={index} fill={entry.fill} />)}
               </Pie>
-              <Tooltip contentStyle={{ background: '#0a192f', border: 'none', borderRadius: 6, color: 'white', fontSize: 12 }} />
+              <Tooltip contentStyle={{ background: 'rgba(8,10,15,0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: 'white', fontSize: 12 }} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
             </PieChart>
           </ResponsiveContainer>
@@ -1346,36 +1348,42 @@ function DashboardView() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <div className="lg:col-span-2 p-5 bg-white border border-slate-200 rounded-lg">
+        <div className="lg:col-span-2 p-5 rounded-2xl border border-white/8 bg-white/[0.025] sirax-card-glow">
           <div className="mb-4">
-            <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Tendencia</div>
-            <h3 className="font-bold text-sirax-navy">Checks últimos 14 días</h3>
+            <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">Tendencia</div>
+            <h3 className="font-bold text-white">Checks últimos 14 días</h3>
           </div>
           <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={data?.trend_14_days || []}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-              <XAxis dataKey="date" stroke="#64748b" fontSize={10} />
-              <YAxis stroke="#64748b" fontSize={11} allowDecimals={false} />
-              <Tooltip contentStyle={{ background: '#0a192f', border: 'none', borderRadius: 6, color: 'white', fontSize: 12 }} />
-              <Line type="monotone" dataKey="count" stroke="#00d1a0" strokeWidth={2} dot={{ fill: '#00d1a0', r: 3 }} />
-            </LineChart>
+            <AreaChart data={data?.trend_14_days || []}>
+              <defs>
+                <linearGradient id="gradChecks" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#22d3ee" stopOpacity={0.4} />
+                  <stop offset="95%" stopColor="#22d3ee" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.07)" vertical={false} />
+              <XAxis dataKey="date" stroke="rgba(255,255,255,0.4)" fontSize={10} tickLine={false} axisLine={false} />
+              <YAxis stroke="rgba(255,255,255,0.4)" fontSize={11} allowDecimals={false} tickLine={false} axisLine={false} />
+              <Tooltip contentStyle={{ background: 'rgba(8,10,15,0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: 'white', fontSize: 12 }} labelStyle={{ color: 'rgba(255,255,255,0.7)' }} />
+              <Area type="monotone" dataKey="count" stroke="#22d3ee" strokeWidth={2} fill="url(#gradChecks)" />
+            </AreaChart>
           </ResponsiveContainer>
         </div>
 
-        <div className="p-5 bg-white border border-slate-200 rounded-lg">
-          <h3 className="font-bold text-sirax-navy mb-1">Checks recientes</h3>
-          <div className="text-[10px] uppercase tracking-wider text-slate-400 mb-3">Últimas verificaciones</div>
+        <div className="p-5 rounded-2xl border border-white/8 bg-white/[0.025] sirax-card-glow">
+          <h3 className="font-bold text-white mb-1">Checks recientes</h3>
+          <div className="text-[10px] uppercase tracking-wider text-white/40 mb-3">Últimas verificaciones</div>
           <div className="space-y-2 max-h-[260px] overflow-y-auto">
             {(data?.recent_checks || []).map((c: any) => (
               <button key={c.id} onClick={() => navigate('check-results', { checkId: c.id })}
-                className="flex items-center gap-3 p-2.5 w-full text-left rounded-md hover:bg-slate-50 transition-colors">
+                className="flex items-center gap-3 p-2.5 w-full text-left rounded-md hover:bg-white/5 transition-colors">
                 <div className={`w-1 h-9 rounded-full ${c.risk_level === 'BAJO' ? 'bg-sirax-teal' : c.risk_level === 'MEDIO' ? 'bg-amber-500' : c.risk_level === 'ALTO' ? 'bg-rose-500' : 'bg-rose-700'}`} />
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-sirax-navy truncate">{c.subject?.full_name}</div>
-                  <div className="text-[10px] text-slate-500 font-mono">{(c.created_at || '').slice(0, 16).replace('T', ' ')}</div>
+                  <div className="text-sm font-medium text-white truncate">{c.subject?.full_name}</div>
+                  <div className="text-[10px] text-white/40 font-mono">{(c.created_at || '').slice(0, 16).replace('T', ' ')}</div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="text-xs font-bold text-sirax-navy">{c.trust_score}</div>
+                  <div className="text-xs font-bold text-white">{c.trust_score}</div>
                   {c.recommendation === 'APPROVE' ? <CheckCircle2 className="h-4 w-4 text-sirax-teal" /> :
                    c.recommendation === 'REVIEW' ? <Eye className="h-4 w-4 text-amber-500" /> :
                    <XCircle className="h-4 w-4 text-rose-500" />}
@@ -1383,7 +1391,7 @@ function DashboardView() {
               </button>
             ))}
             {(!data?.recent_checks || data.recent_checks.length === 0) && (
-              <div className="text-sm text-slate-400 text-center py-6 flex flex-col items-center gap-2">
+              <div className="text-sm text-white/40 text-center py-6 flex flex-col items-center gap-2">
                 <AlertTriangle className="h-5 w-5" />
                 <span>Aún no hay checks. Crea el primero.</span>
               </div>
@@ -1428,8 +1436,8 @@ function NewCheckView() {
     <div className="p-6 lg:p-8 max-w-4xl mx-auto">
       <div className="mb-8">
         <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-sirax-teal mb-1.5">Background Check</div>
-        <h1 className="text-3xl font-extrabold tracking-tighter text-sirax-navy">Nueva verificación</h1>
-        <p className="text-sm text-slate-500 mt-1">Completa los datos del sujeto para el análisis de identidad.</p>
+        <h1 className="text-3xl font-extrabold tracking-tighter text-white">Nueva verificación</h1>
+        <p className="text-sm text-white/50 mt-1">Completa los datos del sujeto para el análisis de identidad.</p>
       </div>
 
       {/* Step indicator */}
@@ -1438,30 +1446,30 @@ function NewCheckView() {
           <React.Fragment key={s}>
             <button onClick={() => i < step && setStep(i)}
               className={`flex items-center gap-2 px-3 py-2 rounded-md text-xs font-semibold transition-colors ${
-                i === step ? 'bg-sirax-navy text-white' : i < step ? 'bg-sirax-teal/15 text-sirax-teal cursor-pointer' : 'bg-slate-100 text-slate-400'
+                i === step ? 'bg-sirax-teal/20 text-sirax-teal border border-sirax-teal/30' : i < step ? 'bg-sirax-teal/10 text-sirax-teal cursor-pointer' : 'bg-white/5 text-white/30'
               }`}>
               {React.createElement(stepIcons[i], { className: 'h-3.5 w-3.5' })}
               {s}
             </button>
-            {i < steps.length - 1 && <div className="w-8 h-px bg-slate-200" />}
+            {i < steps.length - 1 && <div className="w-8 h-px bg-white/8" />}
           </React.Fragment>
         ))}
       </div>
 
       {/* Step 0: Personal */}
       {step === 0 && (
-        <div className="space-y-4 bg-white p-6 rounded-lg border border-slate-200">
-          <h2 className="font-bold text-sirax-navy text-lg mb-4">Datos personales</h2>
+        <div className="space-y-4 rounded-2xl p-6 border border-white/8 bg-white/[0.025] sirax-card-glow">
+          <h2 className="font-bold text-white text-lg mb-4">Datos personales</h2>
           <div>
-            <label className="text-sm font-medium text-slate-700 mb-1 block">Nombre completo *</label>
+            <label className="text-sm font-medium text-white/70 mb-1 block">Nombre completo *</label>
             <input value={form.full_name} onChange={e => setForm(f => ({ ...f, full_name: e.target.value }))}
-              className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal"
+              className="w-full px-3 py-2 rounded-md text-sm text-white placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal border border-white/10 bg-white/5"
               placeholder="Juan Pérez García" />
           </div>
           <div>
-            <label className="text-sm font-medium text-slate-700 mb-1 block">Dirección</label>
+            <label className="text-sm font-medium text-white/70 mb-1 block">Dirección</label>
             <input value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))}
-              className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal"
+              className="w-full px-3 py-2 rounded-md text-sm text-white placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal border border-white/10 bg-white/5"
               placeholder="Ciudad de México, CDMX" />
           </div>
         </div>
@@ -1469,45 +1477,45 @@ function NewCheckView() {
 
       {/* Step 1: Identity */}
       {step === 1 && (
-        <div className="space-y-4 bg-white p-6 rounded-lg border border-slate-200">
-          <h2 className="font-bold text-sirax-navy text-lg mb-4">Datos de identidad</h2>
+        <div className="space-y-4 rounded-2xl p-6 border border-white/8 bg-white/[0.025] sirax-card-glow">
+          <h2 className="font-bold text-white text-lg mb-4">Datos de identidad</h2>
           <div>
-            <label className="text-sm font-medium text-slate-700 mb-1 block">CURP</label>
+            <label className="text-sm font-medium text-white/70 mb-1 block">CURP</label>
             <input value={form.curp} onChange={e => setForm(f => ({ ...f, curp: e.target.value.toUpperCase() }))} maxLength={18}
-              className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal"
+              className="w-full px-3 py-2 rounded-md text-sm font-mono text-white placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal border border-white/10 bg-white/5"
               placeholder="PEGJ800101HDFRRN09" />
-            <p className="text-[10px] text-slate-400 mt-1">18 caracteres · Algoritmo de verificación oficial</p>
+            <p className="text-[10px] text-white/30 mt-1">18 caracteres · Algoritmo de verificación oficial</p>
           </div>
           <div>
-            <label className="text-sm font-medium text-slate-700 mb-1 block">RFC</label>
+            <label className="text-sm font-medium text-white/70 mb-1 block">RFC</label>
             <input value={form.rfc} onChange={e => setForm(f => ({ ...f, rfc: e.target.value.toUpperCase() }))} maxLength={13}
-              className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal"
+              className="w-full px-3 py-2 rounded-md text-sm font-mono text-white placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal border border-white/10 bg-white/5"
               placeholder="PEGJ800101AB1" />
-            <p className="text-[10px] text-slate-400 mt-1">12 (moral) o 13 (física) caracteres</p>
+            <p className="text-[10px] text-white/30 mt-1">12 (moral) o 13 (física) caracteres</p>
           </div>
         </div>
       )}
 
       {/* Step 2: Digital */}
       {step === 2 && (
-        <div className="space-y-4 bg-white p-6 rounded-lg border border-slate-200">
-          <h2 className="font-bold text-sirax-navy text-lg mb-4">Identidad digital</h2>
+        <div className="space-y-4 rounded-2xl p-6 border border-white/8 bg-white/[0.025] sirax-card-glow">
+          <h2 className="font-bold text-white text-lg mb-4">Identidad digital</h2>
           <div>
-            <label className="text-sm font-medium text-slate-700 mb-1 block">Email</label>
+            <label className="text-sm font-medium text-white/70 mb-1 block">Email</label>
             <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-              className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal"
+              className="w-full px-3 py-2 rounded-md text-sm text-white placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal border border-white/10 bg-white/5"
               placeholder="juan@empresa.mx" />
           </div>
           <div>
-            <label className="text-sm font-medium text-slate-700 mb-1 block">Teléfono</label>
+            <label className="text-sm font-medium text-white/70 mb-1 block">Teléfono</label>
             <input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-              className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal"
+              className="w-full px-3 py-2 rounded-md text-sm text-white placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal border border-white/10 bg-white/5"
               placeholder="+52 55 1234 5678" />
           </div>
           <div>
-            <label className="text-sm font-medium text-slate-700 mb-1 block">Username / Alias</label>
+            <label className="text-sm font-medium text-white/70 mb-1 block">Username / Alias</label>
             <input value={form.username} onChange={e => setForm(f => ({ ...f, username: e.target.value }))}
-              className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal"
+              className="w-full px-3 py-2 rounded-md text-sm text-white placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal border border-white/10 bg-white/5"
               placeholder="snupdrack" />
           </div>
         </div>
@@ -1515,9 +1523,9 @@ function NewCheckView() {
 
       {/* Step 3: Modules */}
       {step === 3 && (
-        <div className="space-y-4 bg-white p-6 rounded-lg border border-slate-200">
-          <h2 className="font-bold text-sirax-navy text-lg mb-4">Módulos de análisis</h2>
-          <p className="text-sm text-slate-500 mb-4">Selecciona qué módulos incluir en la verificación.</p>
+        <div className="space-y-4 rounded-2xl p-6 border border-white/8 bg-white/[0.025] sirax-card-glow">
+          <h2 className="font-bold text-white text-lg mb-4">Módulos de análisis</h2>
+          <p className="text-sm text-white/50 mb-4">Selecciona qué módulos incluir en la verificación.</p>
           {[
             { key: 'include_government', label: 'Government Intelligence', desc: 'RENAPO, SAT, IMSS, RND', icon: ShieldCheck },
             { key: 'include_sanctions', label: 'Compliance Intelligence', desc: 'OFAC, ONU, PEP, SAT 69-B, Interpol', icon: Scale },
@@ -1526,15 +1534,15 @@ function NewCheckView() {
             { key: 'include_ai_report', label: 'AI Investigation Report', desc: 'Reporte automático de investigación', icon: Brain },
           ].map(m => (
             <label key={m.key} className={`flex items-center gap-4 p-4 rounded-md border cursor-pointer transition-colors ${
-              (form as any)[m.key] ? 'border-sirax-teal bg-sirax-teal/5' : 'border-slate-200'
+              (form as any)[m.key] ? 'border-sirax-teal bg-sirax-teal/10' : 'border-white/10 bg-white/[0.025]'
             }`}>
               <input type="checkbox" checked={(form as any)[m.key]}
                 onChange={e => setForm(f => ({ ...f, [m.key]: e.target.checked }))}
                 className="h-4 w-4 rounded border-slate-300 accent-[#00d1a0]" />
-              <m.icon className="h-5 w-5 text-slate-600" strokeWidth={1.75} />
+              <m.icon className="h-5 w-5 text-white/60" strokeWidth={1.75} />
               <div>
-                <div className="text-sm font-semibold text-sirax-navy">{m.label}</div>
-                <div className="text-xs text-slate-500">{m.desc}</div>
+                <div className="text-sm font-semibold text-white">{m.label}</div>
+                <div className="text-xs text-white/40">{m.desc}</div>
               </div>
             </label>
           ))}
@@ -1544,7 +1552,7 @@ function NewCheckView() {
       {/* Navigation buttons */}
       <div className="flex items-center justify-between mt-6">
         <button onClick={() => step > 0 ? setStep(step - 1) : navigate('dashboard')}
-          className="flex items-center gap-2 text-sm text-slate-600 hover:text-sirax-navy">
+          className="flex items-center gap-2 text-sm text-white/50 hover:text-white transition-colors">
           <ChevronLeft className="h-4 w-4" /> {step > 0 ? 'Anterior' : 'Cancelar'}
         </button>
         {step < 3 ? (
@@ -1567,18 +1575,62 @@ function NewCheckView() {
   )
 }
 
-// ==================== Score Gauge ====================
+// ==================== Score Gauge (SVG animado — estilo siraxlanding) ====================
 function ScoreGauge({ value, label, color }: { value: number; label: string; color: string }) {
-  const data = [{ name: label, value, fill: color }]
+  const ref = useRef<HTMLDivElement | null>(null)
+  const [display, setDisplay] = useState(0)
+  const [animated, setAnimated] = useState(false)
+
+  useEffect(() => {
+    if (!ref.current) return
+    const obs = new IntersectionObserver(
+      (entries) => { if (entries[0].isIntersecting && !animated) setAnimated(true) },
+      { threshold: 0.4 }
+    )
+    obs.observe(ref.current)
+    return () => obs.disconnect()
+  }, [animated])
+
+  useEffect(() => {
+    if (!animated) return
+    let raf = 0
+    const start = performance.now()
+    const dur = 1400
+    const tick = (t: number) => {
+      const p = Math.min(1, (t - start) / dur)
+      const eased = 1 - Math.pow(1 - p, 3)
+      setDisplay(Math.round(value * eased))
+      if (p < 1) raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [animated, value])
+
+  const radius = 70
+  const circ = 2 * Math.PI * radius
+  const offset = circ - (display / 100) * circ
+
   return (
-    <div className="text-center">
-      <ResponsiveContainer width={140} height={80}>
-        <RadialBarChart innerRadius="70%" outerRadius="100%" data={data} startAngle={180} endAngle={0}>
-          <RadialBar dataKey="value" cornerRadius={10} fill={color} background={{ fill: '#f1f5f9' }} />
-        </RadialBarChart>
-      </ResponsiveContainer>
-      <div className="text-2xl font-extrabold tracking-tighter" style={{ color }}>{value}</div>
-      <div className="text-[10px] uppercase tracking-wider text-slate-400">{label}</div>
+    <div ref={ref} className="text-center">
+      <div className="relative inline-flex items-center justify-center">
+        <svg viewBox="0 0 180 180" className="w-36 h-36 -rotate-90">
+          <circle cx="90" cy="90" r={radius} stroke="rgba(255,255,255,0.06)" strokeWidth="10" fill="none" />
+          <motion.circle
+            cx="90" cy="90" r={radius}
+            stroke={color} strokeWidth="10" fill="none" strokeLinecap="round"
+            strokeDasharray={circ}
+            initial={{ strokeDashoffset: circ }}
+            animate={{ strokeDashoffset: offset }}
+            transition={{ duration: 1.4, ease: [0.16, 1, 0.3, 1] }}
+            style={{ filter: `drop-shadow(0 0 6px ${color}55)` }}
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-3xl font-bold" style={{ color }}>{display}</span>
+          <span className="text-[10px] text-white/40 uppercase tracking-wider">/ 100</span>
+        </div>
+      </div>
+      <div className="text-[10px] uppercase tracking-wider text-white/40 mt-1">{label}</div>
     </div>
   )
 }
@@ -1597,30 +1649,60 @@ function CheckResultsView() {
     }
   }, [check, viewData, token])
 
-  if (loading) return <div className="p-8 animate-pulse space-y-4"><div className="h-8 bg-slate-200 rounded w-96" /><div className="h-64 bg-slate-200 rounded-lg" /></div>
-  if (!check) return <div className="p-8"><p className="text-slate-500">No se encontró el check.</p></div>
+  const [pdfLoading, setPdfLoading] = useState(false)
+  const { toast } = useToast()
+
+  if (loading) return <div className="p-8 animate-pulse space-y-4"><div className="h-8 bg-white/8 rounded w-96" /><div className="h-64 bg-white/8 rounded-lg" /></div>
+  if (!check) return <div className="p-8"><p className="text-white/45">No se encontró el check.</p></div>
 
   const riskColor = RISK_COLORS[check.risk_level] || '#64748b'
+
+  const handleDownloadPDF = async () => {
+    setPdfLoading(true)
+    try {
+      await generateCheckPDF(check)
+      toast({ title: 'PDF generado', description: 'El reporte se descargó correctamente.' })
+    } catch (e) {
+      console.error(e)
+      toast({ title: 'Error al generar PDF', description: 'Intenta de nuevo.', variant: 'destructive' })
+    } finally {
+      setPdfLoading(false)
+    }
+  }
 
   return (
     <div className="p-6 lg:p-8 space-y-6 max-w-6xl mx-auto">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
         <div>
-          <button onClick={() => navigate('history')} className="text-sm text-slate-500 hover:text-sirax-navy flex items-center gap-1 mb-2">
+          <button onClick={() => navigate('history')} className="text-sm text-white/45 hover:text-white flex items-center gap-1 mb-2">
             <ChevronLeft className="h-4 w-4" /> Historial
           </button>
-          <h1 className="text-3xl font-extrabold tracking-tighter text-sirax-navy">{check.subject?.full_name}</h1>
+          <h1 className="text-3xl font-extrabold tracking-tighter text-white">{check.subject?.full_name}</h1>
           <div className="flex items-center gap-3 mt-2">
             <div className="px-2 py-0.5 rounded text-xs font-bold text-white" style={{ backgroundColor: riskColor }}>{check.risk_level}</div>
-            <div className="text-sm text-slate-500">Recomendación: {check.recommendation}</div>
+            <div className="text-sm text-white/45">Recomendación: {check.recommendation}</div>
           </div>
         </div>
-        <div className="text-xs text-slate-400 font-mono">{check.created_at?.slice(0, 19).replace('T', ' ')}</div>
+        <div className="flex items-center gap-3">
+          <div className="text-xs text-white/40 font-mono">{check.created_at?.slice(0, 19).replace('T', ' ')}</div>
+          <motion.button
+            whileHover={{ y: -1 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={handleDownloadPDF}
+            disabled={pdfLoading}
+            className="inline-flex items-center gap-2 bg-sirax-teal text-sirax-navy px-4 py-2 rounded-lg font-semibold text-sm hover:bg-sirax-teal-bright transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {pdfLoading
+              ? <><RefreshCw className="h-4 w-4 animate-spin" /> Generando PDF…</>
+              : <><Download className="h-4 w-4" /> Descargar Reporte PDF</>
+            }
+          </motion.button>
+        </div>
       </div>
 
       {/* Scores */}
-      <div className="grid grid-cols-3 gap-4 bg-white p-6 rounded-lg border border-slate-200">
+      <div className="grid grid-cols-3 gap-4 rounded-2xl p-6 border border-white/8 bg-white/[0.025] sirax-card-glow">
         <ScoreGauge value={check.trust_score} label="Trust Score" color="#00d1a0" />
         <ScoreGauge value={check.risk_score} label="Risk Score" color={riskColor} />
         <ScoreGauge value={check.identity_confidence} label="Confianza" color="#6366f1" />
@@ -1628,10 +1710,10 @@ function CheckResultsView() {
 
       {/* Flags */}
       {check.flags?.length > 0 && (
-        <div className="p-4 rounded-lg border border-rose-200 bg-rose-50">
-          <div className="flex items-center gap-2 text-rose-700 font-semibold text-sm mb-2"><AlertTriangle className="h-4 w-4" /> Alertas</div>
+        <div className="p-4 rounded-xl border border-rose-500/20 bg-rose-500/10">
+          <div className="flex items-center gap-2 text-rose-400 font-semibold text-sm mb-2"><AlertTriangle className="h-4 w-4" /> Alertas</div>
           {check.flags.map((f: string, i: number) => (
-            <div key={i} className="text-sm text-rose-600 flex items-center gap-2"><Flag className="h-3 w-3" />{f}</div>
+            <div key={i} className="text-sm text-rose-400 flex items-center gap-2"><Flag className="h-3 w-3" />{f}</div>
           ))}
         </div>
       )}
@@ -1640,22 +1722,22 @@ function CheckResultsView() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* CURP */}
         {check.curp_validation && (
-          <div className="p-5 bg-white border border-slate-200 rounded-lg">
+          <div className="p-5 rounded-2xl border border-white/8 bg-white/[0.025] sirax-card-glow">
             <div className="flex items-center gap-2 mb-3">
-              <IdCard className="h-4 w-4 text-slate-600" strokeWidth={1.75} />
-              <h3 className="font-bold text-sirax-navy">CURP</h3>
+              <IdCard className="h-4 w-4 text-white/60" strokeWidth={1.75} />
+              <h3 className="font-bold text-white">CURP</h3>
               {check.curp_validation.is_valid ?
                 <CheckCircle2 className="h-4 w-4 text-sirax-teal" /> :
                 <XCircle className="h-4 w-4 text-rose-500" />}
             </div>
-            <div className="text-sm font-mono bg-slate-50 p-3 rounded mb-3">{check.curp_validation.curp}</div>
-            <div className="text-sm text-slate-600">{check.curp_validation.message}</div>
+            <div className="text-sm font-mono bg-white/[0.02] p-3 rounded mb-3">{check.curp_validation.curp}</div>
+            <div className="text-sm text-white/60">{check.curp_validation.message}</div>
             {check.curp_validation.components && (
               <div className="mt-3 space-y-1 text-xs">
-                <div className="flex justify-between"><span className="text-slate-400">Fecha nacimiento</span><span className="text-sirax-navy font-medium">{check.curp_validation.components.birth_date}</span></div>
-                <div className="flex justify-between"><span className="text-slate-400">Sexo</span><span className="text-sirax-navy font-medium">{check.curp_validation.components.sex}</span></div>
-                <div className="flex justify-between"><span className="text-slate-400">Estado</span><span className="text-sirax-navy font-medium">{check.curp_validation.components.state}</span></div>
-                <div className="flex justify-between"><span className="text-slate-400">Dígito verificador</span><span className="text-sirax-navy font-medium">{check.curp_validation.check_digit_valid ? '✓ Válido' : '✗ Inválido'}</span></div>
+                <div className="flex justify-between"><span className="text-white/40">Fecha nacimiento</span><span className="text-sirax-navy font-medium">{check.curp_validation.components.birth_date}</span></div>
+                <div className="flex justify-between"><span className="text-white/40">Sexo</span><span className="text-sirax-navy font-medium">{check.curp_validation.components.sex}</span></div>
+                <div className="flex justify-between"><span className="text-white/40">Estado</span><span className="text-sirax-navy font-medium">{check.curp_validation.components.state}</span></div>
+                <div className="flex justify-between"><span className="text-white/40">Dígito verificador</span><span className="text-sirax-navy font-medium">{check.curp_validation.check_digit_valid ? '✓ Válido' : '✗ Inválido'}</span></div>
               </div>
             )}
           </div>
@@ -1663,21 +1745,21 @@ function CheckResultsView() {
 
         {/* RFC */}
         {check.rfc_validation && (
-          <div className="p-5 bg-white border border-slate-200 rounded-lg">
+          <div className="p-5 rounded-2xl border border-white/8 bg-white/[0.025] sirax-card-glow">
             <div className="flex items-center gap-2 mb-3">
-              <Hash className="h-4 w-4 text-slate-600" strokeWidth={1.75} />
-              <h3 className="font-bold text-sirax-navy">RFC</h3>
+              <Hash className="h-4 w-4 text-white/60" strokeWidth={1.75} />
+              <h3 className="font-bold text-white">RFC</h3>
               {check.rfc_validation.is_valid ?
                 <CheckCircle2 className="h-4 w-4 text-sirax-teal" /> :
                 <XCircle className="h-4 w-4 text-rose-500" />}
             </div>
-            <div className="text-sm font-mono bg-slate-50 p-3 rounded mb-3">{check.rfc_validation.rfc}</div>
-            <div className="text-sm text-slate-600">{check.rfc_validation.message}</div>
+            <div className="text-sm font-mono bg-white/[0.02] p-3 rounded mb-3">{check.rfc_validation.rfc}</div>
+            <div className="text-sm text-white/60">{check.rfc_validation.message}</div>
             {check.rfc_validation.components && (
               <div className="mt-3 space-y-1 text-xs">
-                <div className="flex justify-between"><span className="text-slate-400">Tipo</span><span className="text-sirax-navy font-medium">{check.rfc_validation.type === 'fisica' ? 'Persona Física' : 'Persona Moral'}</span></div>
-                <div className="flex justify-between"><span className="text-slate-400">SAT Status</span><span className={`font-medium ${check.rfc_validation.sat_status === 'ACTIVO' ? 'text-sirax-teal' : 'text-rose-600'}`}>{check.rfc_validation.sat_status}</span></div>
-                <div className="flex justify-between"><span className="text-slate-400">Régimen</span><span className="text-sirax-navy font-medium">{check.rfc_validation.regimen_fiscal}</span></div>
+                <div className="flex justify-between"><span className="text-white/40">Tipo</span><span className="text-sirax-navy font-medium">{check.rfc_validation.type === 'fisica' ? 'Persona Física' : 'Persona Moral'}</span></div>
+                <div className="flex justify-between"><span className="text-white/40">SAT Status</span><span className={`font-medium ${check.rfc_validation.sat_status === 'ACTIVO' ? 'text-sirax-teal' : 'text-rose-600'}`}>{check.rfc_validation.sat_status}</span></div>
+                <div className="flex justify-between"><span className="text-white/40">Régimen</span><span className="text-sirax-navy font-medium">{check.rfc_validation.regimen_fiscal}</span></div>
               </div>
             )}
           </div>
@@ -1685,27 +1767,27 @@ function CheckResultsView() {
 
         {/* Government */}
         {check.government && (
-          <div className="p-5 bg-white border border-slate-200 rounded-lg">
+          <div className="p-5 rounded-2xl border border-white/8 bg-white/[0.025] sirax-card-glow">
             <div className="flex items-center gap-2 mb-3">
-              <ShieldCheck className="h-4 w-4 text-slate-600" strokeWidth={1.75} />
-              <h3 className="font-bold text-sirax-navy">Government Intelligence</h3>
+              <ShieldCheck className="h-4 w-4 text-white/60" strokeWidth={1.75} />
+              <h3 className="font-bold text-white">Government Intelligence</h3>
             </div>
             <div className="space-y-3">
               {check.government.renapo && (
-                <div className="p-3 bg-slate-50 rounded">
-                  <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">RENAPO</div>
-                  <div className="text-sm">{check.government.renapo.found ? <span className="text-sirax-teal font-medium">Registro vigente</span> : <span className="text-slate-500">No encontrado</span>}</div>
+                <div className="p-3 bg-white/[0.02] rounded">
+                  <div className="text-xs font-bold uppercase tracking-wider text-white/40 mb-1">RENAPO</div>
+                  <div className="text-sm">{check.government.renapo.found ? <span className="text-sirax-teal font-medium">Registro vigente</span> : <span className="text-white/45">No encontrado</span>}</div>
                 </div>
               )}
               {check.government.sat && (
-                <div className="p-3 bg-slate-50 rounded">
-                  <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">SAT</div>
+                <div className="p-3 bg-white/[0.02] rounded">
+                  <div className="text-xs font-bold uppercase tracking-wider text-white/40 mb-1">SAT</div>
                   <div className="text-sm">Status: <span className={check.government.sat.status === 'ACTIVO' ? 'text-sirax-teal' : 'text-rose-600'}>{check.government.sat.status}</span></div>
                 </div>
               )}
               {check.government.rnd && (
-                <div className="p-3 bg-slate-50 rounded">
-                  <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">RND (Detenciones)</div>
+                <div className="p-3 bg-white/[0.02] rounded">
+                  <div className="text-xs font-bold uppercase tracking-wider text-white/40 mb-1">RND (Detenciones)</div>
                   <div className="text-sm">{check.government.rnd.sin_resultados ? <span className="text-sirax-teal">Sin registros</span> : <span className="text-rose-600 font-medium">Registro encontrado</span>}</div>
                 </div>
               )}
@@ -1715,10 +1797,10 @@ function CheckResultsView() {
 
         {/* Sanctions */}
         {check.sanctions && (
-          <div className="p-5 bg-white border border-slate-200 rounded-lg">
+          <div className="p-5 rounded-2xl border border-white/8 bg-white/[0.025] sirax-card-glow">
             <div className="flex items-center gap-2 mb-3">
-              <Scale className="h-4 w-4 text-slate-600" strokeWidth={1.75} />
-              <h3 className="font-bold text-sirax-navy">Compliance Intelligence</h3>
+              <Scale className="h-4 w-4 text-white/60" strokeWidth={1.75} />
+              <h3 className="font-bold text-white">Compliance Intelligence</h3>
               {check.sanctions.is_sanctioned ?
                 <XCircle className="h-4 w-4 text-rose-500" /> :
                 check.sanctions.is_pep ? <AlertTriangle className="h-4 w-4 text-amber-500" /> :
@@ -1732,33 +1814,33 @@ function CheckResultsView() {
             {check.sanctions.matches?.length > 0 && (
               <div className="space-y-2">
                 {check.sanctions.matches.map((m: any, i: number) => (
-                  <div key={i} className="p-2 rounded border border-slate-200 text-xs">
+                  <div key={i} className="p-2 rounded border border-white/8 text-xs">
                     <div className="flex items-center justify-between">
                       <span className="font-semibold text-sirax-navy">{m.matched_name}</span>
-                      <span className="text-slate-400">{m.score}%</span>
+                      <span className="text-white/40">{m.score}%</span>
                     </div>
-                    <div className="text-slate-500">{m.list_name} · {m.type} · {m.country}</div>
+                    <div className="text-white/45">{m.list_name} · {m.type} · {m.country}</div>
                   </div>
                 ))}
               </div>
             )}
-            <div className="text-[10px] text-slate-400 mt-3">{check.sanctions.lists_checked?.length || 0} listas consultadas · {check.sanctions.total_records_screened} registros</div>
+            <div className="text-[10px] text-white/40 mt-3">{check.sanctions.lists_checked?.length || 0} listas consultadas · {check.sanctions.total_records_screened} registros</div>
           </div>
         )}
 
         {/* Digital Identity */}
         {check.digital_identity && (
-          <div className="p-5 bg-white border border-slate-200 rounded-lg">
+          <div className="p-5 rounded-2xl border border-white/8 bg-white/[0.025] sirax-card-glow">
             <div className="flex items-center gap-2 mb-3">
-              <Globe2 className="h-4 w-4 text-slate-600" strokeWidth={1.75} />
-              <h3 className="font-bold text-sirax-navy">Digital Identity Intelligence</h3>
+              <Globe2 className="h-4 w-4 text-white/60" strokeWidth={1.75} />
+              <h3 className="font-bold text-white">Digital Identity Intelligence</h3>
             </div>
             <div className="space-y-3">
               {check.digital_identity.email && (
-                <div className="p-3 bg-slate-50 rounded">
-                  <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Email</div>
+                <div className="p-3 bg-white/[0.02] rounded">
+                  <div className="text-xs font-bold uppercase tracking-wider text-white/40 mb-1">Email</div>
                   <div className="text-sm font-mono">{check.digital_identity.email.email}</div>
-                  <div className="text-xs text-slate-500 mt-1">
+                  <div className="text-xs text-white/45 mt-1">
                     {check.digital_identity.email.is_disposable ? <span className="text-rose-600 font-semibold">DESECHEABLE</span> :
                      check.digital_identity.email.is_corporate_business ? <span className="text-sirax-teal">Corporativo</span> : 'Personal'}
                     {' · '}{check.digital_identity.email.breach_count} brechas
@@ -1766,19 +1848,19 @@ function CheckResultsView() {
                 </div>
               )}
               {check.digital_identity.phone && (
-                <div className="p-3 bg-slate-50 rounded">
-                  <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Teléfono</div>
+                <div className="p-3 bg-white/[0.02] rounded">
+                  <div className="text-xs font-bold uppercase tracking-wider text-white/40 mb-1">Teléfono</div>
                   <div className="text-sm">{check.digital_identity.phone.carrier} · {check.digital_identity.phone.line_type}</div>
                   {check.digital_identity.phone.is_spam_reported && <div className="text-xs text-rose-600 font-semibold">Reportado como spam</div>}
                 </div>
               )}
               {check.digital_identity.username?.found && (
-                <div className="p-3 bg-slate-50 rounded">
-                  <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Username: {check.digital_identity.username.username}</div>
+                <div className="p-3 bg-white/[0.02] rounded">
+                  <div className="text-xs font-bold uppercase tracking-wider text-white/40 mb-1">Username: {check.digital_identity.username.username}</div>
                   <div className="text-sm">{check.digital_identity.username.profile_count} perfiles encontrados</div>
                   <div className="flex flex-wrap gap-1 mt-2">
                     {check.digital_identity.username.profiles?.slice(0, 6).map((p: any) => (
-                      <span key={p.platform} className="px-2 py-0.5 bg-white border border-slate-200 rounded text-[10px] font-mono text-slate-600">{p.platform}</span>
+                      <span key={p.platform} className="px-2 py-0.5 bg-white border border-white/8 rounded text-[10px] font-mono text-white/60">{p.platform}</span>
                     ))}
                   </div>
                 </div>
@@ -1789,16 +1871,16 @@ function CheckResultsView() {
 
         {/* Digital Footprint */}
         {check.digital_footprint && (
-          <div className="p-5 bg-white border border-slate-200 rounded-lg">
+          <div className="p-5 rounded-2xl border border-white/8 bg-white/[0.025] sirax-card-glow">
             <div className="flex items-center gap-2 mb-3">
-              <Eye className="h-4 w-4 text-slate-600" strokeWidth={1.75} />
-              <h3 className="font-bold text-sirax-navy">Digital Footprint</h3>
+              <Eye className="h-4 w-4 text-white/60" strokeWidth={1.75} />
+              <h3 className="font-bold text-white">Digital Footprint</h3>
             </div>
             <div className="flex items-center gap-4 mb-4">
               <div className="text-4xl font-extrabold tracking-tighter text-sirax-navy">{check.digital_footprint.presence_score}</div>
               <div>
-                <div className="text-xs uppercase tracking-wider text-slate-400">Presencia digital</div>
-                <div className="text-sm text-slate-600">{check.digital_footprint.social_profiles_count} social · {check.digital_footprint.developer_profiles_count} dev</div>
+                <div className="text-xs uppercase tracking-wider text-white/40">Presencia digital</div>
+                <div className="text-sm text-white/60">{check.digital_footprint.social_profiles_count} social · {check.digital_footprint.developer_profiles_count} dev</div>
               </div>
             </div>
             {check.digital_footprint.professional_presence && (
@@ -1810,11 +1892,11 @@ function CheckResultsView() {
 
       {/* Relationship Graph (simplified visual) */}
       {check.relationship_graph && (
-        <div className="p-5 bg-white border border-slate-200 rounded-lg">
+        <div className="p-5 rounded-2xl border border-white/8 bg-white/[0.025] sirax-card-glow">
           <div className="flex items-center gap-2 mb-4">
-            <Network className="h-4 w-4 text-slate-600" strokeWidth={1.75} />
-            <h3 className="font-bold text-sirax-navy">Relationship Intelligence</h3>
-            <span className="text-xs text-slate-400 ml-2">{check.relationship_graph.analysis?.total_nodes} nodos · {check.relationship_graph.analysis?.total_edges} conexiones</span>
+            <Network className="h-4 w-4 text-white/60" strokeWidth={1.75} />
+            <h3 className="font-bold text-white">Relationship Intelligence</h3>
+            <span className="text-xs text-white/40 ml-2">{check.relationship_graph.analysis?.total_nodes} nodos · {check.relationship_graph.analysis?.total_edges} conexiones</span>
           </div>
           {check.relationship_graph.analysis?.suspicious_patterns?.length > 0 && (
             <div className="p-3 rounded border border-rose-200 bg-rose-50 mb-4">
@@ -1827,14 +1909,14 @@ function CheckResultsView() {
             {check.relationship_graph.graph?.nodes?.map((n: any) => (
               <div key={n.data.id}
                 className={`px-3 py-2 rounded-md border text-xs font-medium ${
-                  n.data.type === 'Person' ? 'bg-slate-100 border-slate-300 text-sirax-navy' :
+                  n.data.type === 'Person' ? 'bg-white/5 border-slate-300 text-sirax-navy' :
                   n.data.type === 'Email' ? 'bg-sky-50 border-sky-200 text-sky-700' :
                   n.data.type === 'Phone' ? 'bg-cyan-50 border-cyan-200 text-cyan-700' :
                   n.data.type === 'Curp' ? 'bg-purple-50 border-purple-200 text-purple-700' :
                   n.data.type === 'Rfc' ? 'bg-violet-50 border-violet-200 text-violet-700' :
                   n.data.type === 'SanctionMatch' ? 'bg-rose-50 border-rose-200 text-rose-700' :
                   n.data.type === 'SocialProfile' ? 'bg-gray-50 border-gray-200 text-gray-700' :
-                  'bg-slate-50 border-slate-200 text-slate-600'
+                  'bg-white/[0.02] border-white/8 text-white/60'
                 }`}>
                 {n.data.label}
               </div>
@@ -1845,17 +1927,17 @@ function CheckResultsView() {
 
       {/* Score Breakdown */}
       {check.breakdown && (
-        <div className="p-5 bg-white border border-slate-200 rounded-lg">
+        <div className="p-5 rounded-2xl border border-white/8 bg-white/[0.025] sirax-card-glow">
           <div className="flex items-center gap-2 mb-4">
-            <Target className="h-4 w-4 text-slate-600" strokeWidth={1.75} />
-            <h3 className="font-bold text-sirax-navy">Score Breakdown</h3>
+            <Target className="h-4 w-4 text-white/60" strokeWidth={1.75} />
+            <h3 className="font-bold text-white">Score Breakdown</h3>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <div className="text-xs font-bold uppercase tracking-wider text-sirax-teal mb-2">Factores positivos (Trust)</div>
               {check.breakdown.trust_components?.map((c: any, i: number) => (
                 <div key={i} className="flex items-center justify-between text-sm py-1">
-                  <span className="text-slate-600">{c.label}</span>
+                  <span className="text-white/60">{c.label}</span>
                   <span className="text-sirax-teal font-semibold">+{c.points}</span>
                 </div>
               ))}
@@ -1864,7 +1946,7 @@ function CheckResultsView() {
               <div className="text-xs font-bold uppercase tracking-wider text-rose-600 mb-2">Factores de riesgo</div>
               {check.breakdown.risk_components?.map((c: any, i: number) => (
                 <div key={i} className="flex items-center justify-between text-sm py-1">
-                  <span className="text-slate-600">{c.label}</span>
+                  <span className="text-white/60">{c.label}</span>
                   <span className="text-rose-600 font-semibold">+{c.points}</span>
                 </div>
               ))}
@@ -1875,13 +1957,13 @@ function CheckResultsView() {
 
       {/* AI Report */}
       {check.ai_report && (
-        <div className="p-5 bg-white border border-slate-200 rounded-lg">
+        <div className="p-5 rounded-2xl border border-white/8 bg-white/[0.025] sirax-card-glow">
           <div className="flex items-center gap-2 mb-4">
             <Brain className="h-4 w-4 text-sirax-teal" strokeWidth={1.75} />
-            <h3 className="font-bold text-sirax-navy">AI Investigation Report</h3>
+            <h3 className="font-bold text-white">AI Investigation Report</h3>
             <span className="ml-2 px-2 py-0.5 rounded text-[10px] font-semibold bg-sirax-teal/10 text-sirax-teal uppercase tracking-wider">sirax · AI</span>
           </div>
-          <div className="prose prose-sm max-w-none text-slate-700">
+          <div className="prose prose-sm max-w-none text-white/70">
             {check.ai_report.split('\n').map((line: string, i: number) => {
               if (line.startsWith('## ')) return <h2 key={i} className="text-lg font-bold text-sirax-navy mt-4 mb-2">{line.slice(3)}</h2>
               if (line.startsWith('**') && line.endsWith('**')) return <p key={i} className="font-semibold text-sirax-navy">{line.replace(/\*\*/g, '')}</p>
@@ -1894,11 +1976,11 @@ function CheckResultsView() {
 
       {/* Sources */}
       {check.sources_consulted?.length > 0 && (
-        <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
-          <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Fuentes consultadas</div>
+        <div className="p-4 bg-white/[0.02] rounded-lg border border-white/8">
+          <div className="text-xs font-bold uppercase tracking-wider text-white/40 mb-2">Fuentes consultadas</div>
           <div className="flex flex-wrap gap-2">
             {check.sources_consulted.map((s: string, i: number) => (
-              <span key={i} className="px-2 py-1 bg-white border border-slate-200 rounded text-xs font-mono text-slate-600">{s}</span>
+              <span key={i} className="px-2 py-1 bg-white border border-white/8 rounded text-xs font-mono text-white/60">{s}</span>
             ))}
           </div>
         </div>
@@ -1933,23 +2015,23 @@ function HistoryView() {
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
         <div>
           <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-sirax-teal mb-1.5">Historial</div>
-          <h1 className="text-3xl font-extrabold tracking-tighter text-sirax-navy">Background Checks</h1>
+          <h1 className="text-3xl font-extrabold tracking-tighter text-white">Background Checks</h1>
         </div>
         <button onClick={() => navigate('new-check')}
-          className="inline-flex items-center gap-2 bg-sirax-navy text-white px-5 py-2.5 rounded-md font-semibold text-sm hover:bg-sirax-navy-soft transition-colors">
+          className="inline-flex items-center gap-2 bg-sirax-teal text-sirax-navy px-5 py-2.5 rounded-md font-semibold text-sm hover:bg-sirax-teal-bright transition-colors">
           <Plus className="h-4 w-4" /> Nuevo Check
         </button>
       </div>
 
       <div className="flex gap-3">
         <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
           <input value={search} onChange={e => setSearch(e.target.value)}
-            className="w-full pl-10 pr-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal"
+            className="w-full pl-10 pr-3 py-2 border border-white/10 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal"
             placeholder="Buscar por nombre..." />
         </div>
         <select value={riskFilter} onChange={e => setRiskFilter(e.target.value)}
-          className="px-3 py-2 border border-slate-200 rounded-md text-sm">
+          className="px-3 py-2 border border-white/10 rounded-xl text-sm">
           <option value="">Todos los niveles</option>
           <option value="BAJO">Bajo</option>
           <option value="MEDIO">Medio</option>
@@ -1958,36 +2040,36 @@ function HistoryView() {
         </select>
       </div>
 
-      {loading ? <div className="animate-pulse space-y-3">{[1,2,3].map(i => <div key={i} className="h-16 bg-slate-200 rounded-lg" />)}</div> : (
-        <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+      {loading ? <div className="animate-pulse space-y-3">{[1,2,3].map(i => <div key={i} className="h-16 bg-white/8 rounded-lg" />)}</div> : (
+        <div className="rounded-2xl border border-white/8 bg-white/[0.025] overflow-hidden">
           <table className="w-full">
-            <thead className="bg-slate-50">
+            <thead className="bg-white/[0.02]">
               <tr>
-                <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-400">Sujeto</th>
-                <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-400">Trust</th>
-                <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-400">Risk</th>
-                <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-400">Nivel</th>
-                <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-400">Fecha</th>
-                <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-400"></th>
+                <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-white/40">Sujeto</th>
+                <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-white/40">Trust</th>
+                <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-white/40">Risk</th>
+                <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-white/40">Nivel</th>
+                <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-white/40">Fecha</th>
+                <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-white/40"></th>
               </tr>
             </thead>
             <tbody>
               {checks.map((c: any) => (
-                <tr key={c.id} className="border-t border-slate-100 hover:bg-slate-50 cursor-pointer" onClick={() => navigate('check-results', { checkId: c.id })}>
+                <tr key={c.id} className="border-t border-white/6 hover:bg-white/[0.02] cursor-pointer" onClick={() => navigate('check-results', { checkId: c.id })}>
                   <td className="px-4 py-3 text-sm font-medium text-sirax-navy">{c.subject?.full_name}</td>
                   <td className="px-4 py-3 text-sm font-bold text-sirax-teal">{c.trust_score}</td>
                   <td className="px-4 py-3 text-sm font-bold" style={{ color: RISK_COLORS[c.risk_level] }}>{c.risk_score}</td>
                   <td className="px-4 py-3">
                     <span className="px-2 py-0.5 rounded text-xs font-bold text-white" style={{ backgroundColor: RISK_COLORS[c.risk_level] }}>{c.risk_level}</span>
                   </td>
-                  <td className="px-4 py-3 text-xs text-slate-500 font-mono">{c.created_at?.slice(0, 10)}</td>
-                  <td className="px-4 py-3"><ArrowRight className="h-4 w-4 text-slate-300" /></td>
+                  <td className="px-4 py-3 text-xs text-white/45 font-mono">{c.created_at?.slice(0, 10)}</td>
+                  <td className="px-4 py-3"><ArrowRight className="h-4 w-4 text-white/55" /></td>
                 </tr>
               ))}
             </tbody>
           </table>
           {checks.length === 0 && (
-            <div className="p-12 text-center text-slate-400">
+            <div className="p-12 text-center text-white/40">
               <FileSearch className="h-8 w-8 mx-auto mb-3" />
               <p>No hay checks. Crea el primero.</p>
             </div>
@@ -2018,13 +2100,13 @@ function CurpValidatorView() {
     <div className="p-6 lg:p-8 max-w-2xl mx-auto">
       <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-sirax-teal mb-1.5">Herramienta</div>
       <h1 className="text-3xl font-extrabold tracking-tighter text-sirax-navy mb-2">Validador de CURP</h1>
-      <p className="text-sm text-slate-500 mb-6">Validación contra algoritmo oficial mexicano con dígito verificador.</p>
+      <p className="text-sm text-white/45 mb-6">Validación contra algoritmo oficial mexicano con dígito verificador.</p>
 
-      <div className="bg-white p-6 rounded-lg border border-slate-200 space-y-4">
+      <div className="bg-white p-6 rounded-lg border border-white/8 space-y-4">
         <div>
-          <label className="text-sm font-medium text-slate-700 mb-1 block">CURP</label>
+          <label className="text-sm font-medium text-white/70 mb-1 block">CURP</label>
           <input value={curp} onChange={e => setCurp(e.target.value.toUpperCase())} maxLength={18}
-            className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal"
+            className="w-full px-3 py-2 rounded-md text-sm font-mono text-white placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal border border-white/10 bg-white/5"
             placeholder="PEGJ800101HDFRRN09" />
         </div>
         <button onClick={validate} disabled={loading || !curp}
@@ -2042,10 +2124,10 @@ function CurpValidatorView() {
           <p className="text-sm">{result.message}</p>
           {result.components && (
             <div className="mt-4 space-y-2 text-sm">
-              <div className="flex justify-between"><span className="text-slate-500">Fecha nacimiento</span><span className="font-medium">{result.components.birth_date}</span></div>
-              <div className="flex justify-between"><span className="text-slate-500">Sexo</span><span className="font-medium">{result.components.sex}</span></div>
-              <div className="flex justify-between"><span className="text-slate-500">Estado</span><span className="font-medium">{result.components.state}</span></div>
-              <div className="flex justify-between"><span className="text-slate-500">Dígito verificador</span><span className="font-medium">{result.check_digit_valid ? '✓ Correcto' : '✗ Incorrecto'}</span></div>
+              <div className="flex justify-between"><span className="text-white/45">Fecha nacimiento</span><span className="font-medium">{result.components.birth_date}</span></div>
+              <div className="flex justify-between"><span className="text-white/45">Sexo</span><span className="font-medium">{result.components.sex}</span></div>
+              <div className="flex justify-between"><span className="text-white/45">Estado</span><span className="font-medium">{result.components.state}</span></div>
+              <div className="flex justify-between"><span className="text-white/45">Dígito verificador</span><span className="font-medium">{result.check_digit_valid ? '✓ Correcto' : '✗ Incorrecto'}</span></div>
             </div>
           )}
         </div>
@@ -2074,13 +2156,13 @@ function RfcValidatorView() {
     <div className="p-6 lg:p-8 max-w-2xl mx-auto">
       <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-sirax-teal mb-1.5">Herramienta</div>
       <h1 className="text-3xl font-extrabold tracking-tighter text-sirax-navy mb-2">Validador de RFC</h1>
-      <p className="text-sm text-slate-500 mb-6">Validación para persona física (13) y moral (12) con verificación SAT.</p>
+      <p className="text-sm text-white/45 mb-6">Validación para persona física (13) y moral (12) con verificación SAT.</p>
 
-      <div className="bg-white p-6 rounded-lg border border-slate-200 space-y-4">
+      <div className="bg-white p-6 rounded-lg border border-white/8 space-y-4">
         <div>
-          <label className="text-sm font-medium text-slate-700 mb-1 block">RFC</label>
+          <label className="text-sm font-medium text-white/70 mb-1 block">RFC</label>
           <input value={rfc} onChange={e => setRfc(e.target.value.toUpperCase())} maxLength={13}
-            className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal"
+            className="w-full px-3 py-2 rounded-md text-sm font-mono text-white placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal border border-white/10 bg-white/5"
             placeholder="PEGJ800101AB1" />
         </div>
         <button onClick={validate} disabled={loading || !rfc}
@@ -2098,9 +2180,9 @@ function RfcValidatorView() {
           <p className="text-sm">{result.message}</p>
           {result.components && (
             <div className="mt-4 space-y-2 text-sm">
-              <div className="flex justify-between"><span className="text-slate-500">Tipo</span><span className="font-medium">{result.type === 'fisica' ? 'Persona Física' : 'Persona Moral'}</span></div>
-              <div className="flex justify-between"><span className="text-slate-500">Fecha</span><span className="font-medium">{result.components.date}</span></div>
-              <div className="flex justify-between"><span className="text-slate-500">SAT Status</span><span className={`font-medium ${result.sat_status === 'ACTIVO' ? 'text-sirax-teal' : 'text-rose-600'}`}>{result.sat_status}</span></div>
+              <div className="flex justify-between"><span className="text-white/45">Tipo</span><span className="font-medium">{result.type === 'fisica' ? 'Persona Física' : 'Persona Moral'}</span></div>
+              <div className="flex justify-between"><span className="text-white/45">Fecha</span><span className="font-medium">{result.components.date}</span></div>
+              <div className="flex justify-between"><span className="text-white/45">SAT Status</span><span className={`font-medium ${result.sat_status === 'ACTIVO' ? 'text-sirax-teal' : 'text-rose-600'}`}>{result.sat_status}</span></div>
             </div>
           )}
         </div>
@@ -2129,13 +2211,13 @@ function SanctionsView() {
     <div className="p-6 lg:p-8 max-w-3xl mx-auto">
       <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-sirax-teal mb-1.5">Herramienta</div>
       <h1 className="text-3xl font-extrabold tracking-tighter text-sirax-navy mb-2">Screening de Sanciones</h1>
-      <p className="text-sm text-slate-500 mb-6">Fuzzy matching contra OFAC, ONU, PEP, SAT 69-B, Interpol y más.</p>
+      <p className="text-sm text-white/45 mb-6">Fuzzy matching contra OFAC, ONU, PEP, SAT 69-B, Interpol y más.</p>
 
-      <div className="bg-white p-6 rounded-lg border border-slate-200 space-y-4">
+      <div className="bg-white p-6 rounded-lg border border-white/8 space-y-4">
         <div>
-          <label className="text-sm font-medium text-slate-700 mb-1 block">Nombre completo</label>
+          <label className="text-sm font-medium text-white/70 mb-1 block">Nombre completo</label>
           <input value={name} onChange={e => setName(e.target.value)}
-            className="w-full px-3 py-2 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal"
+            className="w-full px-3 py-2 rounded-md text-sm text-white placeholder-white/20 focus:outline-none focus:ring-2 focus:ring-sirax-teal focus:border-sirax-teal border border-white/10 bg-white/5"
             placeholder="Juan Pérez García" />
         </div>
         <button onClick={screen} disabled={loading || !name}
@@ -2157,18 +2239,18 @@ function SanctionsView() {
             <div className="mt-4 space-y-3">
               <h4 className="text-sm font-bold text-sirax-navy">Coincidencias:</h4>
               {result.matches.map((m: any, i: number) => (
-                <div key={i} className="p-3 bg-white rounded border border-slate-200">
+                <div key={i} className="p-3 bg-white rounded border border-white/8">
                   <div className="flex items-center justify-between">
                     <span className="font-semibold text-sirax-navy">{m.matched_name}</span>
-                    <span className="px-2 py-0.5 rounded text-xs font-bold bg-slate-100">{m.score}%</span>
+                    <span className="px-2 py-0.5 rounded text-xs font-bold bg-white/5">{m.score}%</span>
                   </div>
-                  <div className="text-xs text-slate-500 mt-1">{m.list_name} · {m.type} · {m.country} · {m.program}</div>
+                  <div className="text-xs text-white/45 mt-1">{m.list_name} · {m.type} · {m.country} · {m.program}</div>
                 </div>
               ))}
             </div>
           )}
 
-          <div className="mt-4 text-xs text-slate-400">
+          <div className="mt-4 text-xs text-white/40">
             {result.lists_checked?.length} listas consultadas · {result.total_records_screened} registros · Threshold: {result.threshold_used}%
           </div>
         </div>
@@ -2200,27 +2282,27 @@ function ApiDocsView() {
     <div className="p-6 lg:p-8 max-w-4xl mx-auto">
       <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-sirax-teal mb-1.5">Documentación</div>
       <h1 className="text-3xl font-extrabold tracking-tighter text-sirax-navy mb-2">API Reference</h1>
-      <p className="text-sm text-slate-500 mb-6">REST API para integraciones con CRMs, ERPs, fintechs y bancos.</p>
+      <p className="text-sm text-white/45 mb-6">REST API para integraciones con CRMs, ERPs, fintechs y bancos.</p>
 
-      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+      <div className="rounded-2xl border border-white/8 bg-white/[0.025] overflow-hidden">
         <table className="w-full">
-          <thead className="bg-slate-50">
+          <thead className="bg-white/[0.02]">
             <tr>
-              <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-400">Method</th>
-              <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-400">Endpoint</th>
-              <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-400">Descripción</th>
-              <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-400">Body / Params</th>
+              <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-white/40">Method</th>
+              <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-white/40">Endpoint</th>
+              <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-white/40">Descripción</th>
+              <th className="text-left px-4 py-3 text-xs font-bold uppercase tracking-wider text-white/40">Body / Params</th>
             </tr>
           </thead>
           <tbody>
             {endpoints.map((ep, i) => (
-              <tr key={i} className="border-t border-slate-100">
+              <tr key={i} className="border-t border-white/6">
                 <td className="px-4 py-3">
                   <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${ep.method === 'POST' ? 'bg-sirax-teal/15 text-sirax-teal' : 'bg-sky-100 text-sky-700'}`}>{ep.method}</span>
                 </td>
                 <td className="px-4 py-3 text-xs font-mono text-sirax-navy">{ep.path}</td>
-                <td className="px-4 py-3 text-sm text-slate-600">{ep.desc}</td>
-                <td className="px-4 py-3 text-xs font-mono text-slate-400">{ep.body}</td>
+                <td className="px-4 py-3 text-sm text-white/60">{ep.desc}</td>
+                <td className="px-4 py-3 text-xs font-mono text-white/40">{ep.body}</td>
               </tr>
             ))}
           </tbody>
@@ -2229,10 +2311,10 @@ function ApiDocsView() {
 
       <div className="mt-8 p-6 bg-sirax-navy rounded-lg text-white">
         <div className="flex items-center justify-between mb-3">
-          <div className="text-xs font-bold uppercase tracking-wider text-slate-400">Ejemplo: Background Check completo</div>
+          <div className="text-xs font-bold uppercase tracking-wider text-white/40">Ejemplo: Background Check completo</div>
           <span className="text-[10px] font-mono text-sirax-teal">sirax API · v1</span>
         </div>
-        <pre className="text-xs font-mono text-slate-300 leading-relaxed overflow-x-auto">{`curl -X POST /api/checks \\
+        <pre className="text-xs font-mono text-white/55 leading-relaxed overflow-x-auto">{`curl -X POST /api/checks \\
   -H "Authorization: Bearer YOUR_TOKEN" \\
   -H "Content-Type: application/json" \\
   -d '{
