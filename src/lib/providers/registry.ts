@@ -31,6 +31,22 @@ export const PROVIDER_REGISTRY: ProviderInfo[] = [
     docsUrl: 'https://nubarium.com/productos',
   },
   {
+    id: 'apimarket',
+    label: 'ApiMarket — CURP/RENAPO (fallback 1)',
+    category: 'gobierno',
+    envVars: ['APIMARKET_API_KEY'],
+    configured: () => !!process.env.APIMARKET_API_KEY,
+    docsUrl: 'https://apimarket.mx',
+  },
+  {
+    id: 'datosnonstop',
+    label: 'datosnonstop — CURP/RENAPO (fallback 2)',
+    category: 'gobierno',
+    envVars: ['DATOSNONSTOP_API_KEY'],
+    configured: () => !!process.env.DATOSNONSTOP_API_KEY,
+    docsUrl: 'https://datosnonstop.com',
+  },
+  {
     id: 'opensanctions',
     label: 'OpenSanctions — OFAC / ONU / EU / UK',
     category: 'sanciones',
