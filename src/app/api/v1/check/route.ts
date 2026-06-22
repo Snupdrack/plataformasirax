@@ -95,7 +95,7 @@ export const POST = withApiAuth('check', async (request) => {
     ])
     const gov: any = {}
     if (renapoR) { gov.renapo = renapoR; track(renapoR.source || 'RENAPO', renapoR.available, renapoR.message) }
-    if (satR)    { gov.sat    = satR;    track('SAT (Nubarium)',    satR.available,    satR.message)    }
+    if (satR)    { gov.sat    = satR;    track(satR.source || 'SAT', satR.available, satR.message) }
     if (imssR)   { gov.imss   = imssR;   track('IMSS (Nubarium)',   imssR.available,   imssR.message)   }
     gov.rnd = rndR
     track('RND (SSPC)', false, rndR.message)
