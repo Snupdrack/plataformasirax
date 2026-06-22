@@ -1,0 +1,24 @@
+# ══════════════════════════════════════════════════════
+# Sirax · Synkdata — Railway configuration
+# Docs: https://docs.railway.com/reference/config-as-code
+# ══════════════════════════════════════════════════════
+
+[build]
+# Usar Dockerfile en lugar del buildpack de Railway
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+# Número de réplicas (1 es suficiente para empezar)
+numReplicas = 1
+
+# Política de reinicio ante crash
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5
+
+# Healthcheck — apunta al endpoint /api/health del proyecto
+healthcheckPath = "/api/health"
+healthcheckTimeout = 30
+
+# Tiempo que Railway espera al servidor antes de marcar el deploy como fallido
+startupProbeInitialDelaySeconds = 15
