@@ -11,6 +11,8 @@
 import {
   nubariumValidateCurp, nubariumValidateRfc, nubariumImssHistorial, nubariumScreenPep,
 } from './providers/nubarium'
+import { apimarketValidateCurp } from './providers/apimarket'
+import { datosnonstopValidateCurp } from './providers/datosnonstop'
 import { opensanctionsMatch } from './providers/opensanctions'
 import { hibpCheckBreaches } from './providers/hibp'
 import { hunterVerifyEmail } from './providers/hunter'
@@ -151,27 +153,72 @@ export function validateRfc(rfc: string): any {
 
 // ==================== GOVERNMENT INTELLIGENCE (consultas reales) ====================
 
+// Orden de fallback para CURP/RENAPO: ApiMarket -> datosnonstop -> Nubarium.
+// Cada proveedor regresa { ok, configured, found?, ... } siguiendo la
+// convención de src/lib/providers/_template.ts. Se intenta el siguiente
+// proveedor solo si el actual no está configurado (sin API key) o falló
+// (error de red/HTTP) — NO si simplemente no encontró la CURP (eso ya es
+// una respuesta real de la fuente y no debe enmascararse intentando otra).
+const RENAPO_PROVIDERS: Array<{ id: string; call: (curp: string) => Promise<any> }> = [
+  { id: 'ApiMarket', call: apimarketValidateCurp },
+  { id: 'datosnonstop', call: datosnonstopValidateCurp },
+  { id: 'Nubarium', call: nubariumValidateCurp },
+]
+
 export async function queryRenapo(curp: string, fullName?: string): Promise<any> {
   if (!curp || curp.length !== 18) {
     return { found: false, available: false, source: 'RENAPO', message: 'CURP no proporcionado o inválido' }
   }
-  const result = await nubariumValidateCurp(curp)
-  if (!result.configured) {
-    return { found: false, available: false, source: 'RENAPO', message: result.error }
+
+  const attempts: Array<{ provider: string; configured: boolean; ok: boolean; error?: string }> = []
+
+  for (const { id, call } of RENAPO_PROVIDERS) {
+    const result = await call(curp)
+
+    if (!result.configured) {
+      attempts.push({ provider: id, configured: false, ok: false, error: result.error })
+      continue // sin API key configurada, intenta el siguiente proveedor
+    }
+
+    if (!result.ok) {
+      attempts.push({ provider: id, configured: true, ok: false, error: result.error })
+      continue // se intentó pero falló (red/HTTP), intenta el siguiente proveedor
+    }
+
+    // Llegó respuesta válida de este proveedor (encontrada o no) — es la
+    // respuesta final, no se sigue intentando con los demás.
+    if (!result.found) {
+      return {
+        found: false,
+        available: true,
+        source: `RENAPO (${id})`,
+        registry_status: 'NO_ENCONTRADO',
+        message: result.message || 'CURP no encontrada en RENAPO',
+        attempts,
+      }
+    }
+
+    return {
+      found: true,
+      available: true,
+      source: `RENAPO (${id})`,
+      registry_status: 'VIGENTE',
+      validation_id: result.validation_id,
+      data: result.data,
+      attempts,
+    }
   }
-  if (!result.ok) {
-    return { found: false, available: true, source: 'RENAPO', error: result.error }
-  }
-  if (!result.found) {
-    return { found: false, available: true, source: 'RENAPO', registry_status: 'NO_ENCONTRADO', message: result.message || 'CURP no encontrada en RENAPO' }
-  }
+
+  // Ningún proveedor pudo responder: o ninguno está configurado, o todos fallaron.
+  const anyConfigured = attempts.some(a => a.configured)
   return {
-    found: true,
-    available: true,
+    found: false,
+    available: anyConfigured,
     source: 'RENAPO',
-    registry_status: 'VIGENTE',
-    validation_id: result.validation_id,
-    data: result.data,
+    message: anyConfigured
+      ? `Todos los proveedores de RENAPO fallaron: ${attempts.map(a => `${a.provider}: ${a.error}`).join(' | ')}`
+      : 'Ningún proveedor de RENAPO está configurado (faltan API keys en .env: APIMARKET_API_KEY, DATOSNONSTOP_API_KEY, NUBARIUM_USER/NUBARIUM_PASSWORD)',
+    attempts,
   }
 }
 
